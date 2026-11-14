@@ -214,6 +214,23 @@ private const val RELEASES_URL = "$REPO_URL/releases"
 private const val API_LATEST = "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/releases/latest"
 
 /** GitHub release JSON 里的 tag 提取 —— 编译期构造一次（门禁 ⑲ 把语句位置正则算作热路径）。 */
+/** 把 "v1.3.2" / "1.3.2-beta" 拆成数字段。 */
+private fun versionParts(raw: String): List<Int> =
+    raw.trim().removePrefix("v").removePrefix("V").substringBefore('-')
+        .split('.').map { it.toIntOrNull() ?: 0 }
+
+/** 远端 a 是否**严格大于**本地 b（逐段比较，缺段补 0）。 */
+private fun semverGreater(a: String, b: String): Boolean {
+    val pa = versionParts(a)
+    val pb = versionParts(b)
+    for (i in 0 until maxOf(pa.size, pb.size)) {
+        val x = pa.getOrNull(i) ?: 0
+        val y = pb.getOrNull(i) ?: 0
+        if (x != y) return x > y
+    }
+    return false
+}
+
 private val TAG_RE = Regex("\"tag_name\"\\s*:\\s*\"([^\"]+)\"")
 
 private sealed interface UpdateState {
@@ -276,10 +293,11 @@ private fun AboutDialog(onDismiss: () -> Unit) {
             val tag: String? = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { fetchLatestTag() }
             if (tag == null) {
                 UpdateState.Failed("连不上 GitHub，稍后再试")
-            } else if (tag.trimStart('v', 'V') == selfVer) {
-                UpdateState.Latest
             } else {
-                UpdateState.Newer(tag)
+                // 只按语义比较：远端**严格大于**本地才提示。
+                // 以前是 `tag.trimStart('v','V') == selfVer` —— 任何"不相等"都报"有新版本"，
+                // 于是本地 1.3.3 也会被提示"更新到 1.3.2"（2026-11-14 实测反馈）。
+                if (semverGreater(tag, selfVer)) UpdateState.Newer(tag) else UpdateState.Latest
             }
         }.getOrElse { UpdateState.Failed(it.message ?: "检查失败") }
     }

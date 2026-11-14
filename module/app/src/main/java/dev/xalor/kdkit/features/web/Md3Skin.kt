@@ -298,13 +298,24 @@ object Md3Skin : SwitchFeature(
     }
     function glassify(){
       var els = document.querySelectorAll('div, section, li');
-      for (var i = 0; i < els.length && DONE < 120; i++) {
+      // 硬预算（2026-11-14 事故）：这里以前对**每一个** div/section/li 都调用
+      // getBoundingClientRect + innerText + getComputedStyle，三个都是强制布局的操作。
+      // 拍题页/答案页那种几千个节点的页面，光这一轮就能把 WebView 主线程压住好几秒
+      // ⇒「从子页面返回直接卡死」。现在：访问上限 + 单帧时间预算，超了立刻收手。
+      var budget = 10;                 // ms，一次最多占用一帧的一部分
+      var t0 = (window.performance && performance.now) ? performance.now() : Date.now();
+      var now = t0;
+      var cap = Math.min(els.length, 700);
+      for (var i = 0; i < cap && DONE < 60; i++) {
+        now = (window.performance && performance.now) ? performance.now() : Date.now();
+        if (now - t0 > budget) { break; }
         var el = els[i];
         if (el.__kdkit_glass) continue;
+        // textContent 不触发 reflow；innerText 会（这就是原来卡死的直接原因之一）
+        var txt = el.textContent || '';
+        if (txt.length > 400) continue;
         var r = el.getBoundingClientRect();
         if (r.width * r.height < 20000) continue;
-        var txt = (el.innerText || '').trim();
-        if (txt.length > 400) continue;
         var cs = getComputedStyle(el);
         var c = rgba(cs);
         if (!c) continue;
@@ -318,10 +329,8 @@ object Md3Skin : SwitchFeature(
         el.style.setProperty('box-shadow',
           'inset 0 1.5px 0 ' + EDGE + ', inset 0 -1px 0 ' +
           (DARK ? 'rgba(255,255,255,.10)' : 'rgba(255,255,255,.45)') + ', ' + SHADOW, 'important');
-        // 液态玻璃的关键：背景模糊 + 饱和提升。只在"被我们改造成玻璃"的块上生效，
-        // 且白屏自愈（REVERT_IF_BLANK_JS）会兜底撤掉。
-        // 真模糊只给最大的 6 块：大面积 backdrop-filter 会把渲染线程压到 ANR（2026-11-14 实测）。
-        if (BLURRED < 6 && r.width * r.height > 120000) {
+        // 真模糊只给最大的 4 块：大面积 backdrop-filter 会把渲染线程压到 ANR。
+        if (BLURRED < 4 && r.width * r.height > 150000) {
           el.style.setProperty('backdrop-filter', 'blur(16px) saturate(150%) brightness(1.03)', 'important');
           el.style.setProperty('-webkit-backdrop-filter', 'blur(16px) saturate(150%) brightness(1.03)', 'important');
           BLURRED++;
@@ -329,8 +338,9 @@ object Md3Skin : SwitchFeature(
         el.__kdkit_glass = 1; DONE++;
       }
     }
+    // 只跑两轮，且第二轮延后——每轮都有 10ms 预算，不会连续吃满主线程
     glassify();
-    setTimeout(glassify, 900); setTimeout(glassify, 2400);
+    setTimeout(glassify, 1200);
   })();
 """
 

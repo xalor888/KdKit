@@ -156,12 +156,30 @@ object SettingsEntry : SwitchFeature(
           var MARKS = ['第三方信息共享清单', '个人信息收集清单', '撤回同意隐私政策',
                        '系统权限列表', '问题诊断', '图标设置'];
           function norm(s) { return (s || '').replace(/[\s\u00a0]+/g, ''); }
-          function bodyText() { return (document.body && document.body.innerText) || ''; }
-          function isSettingsPage() {
-            var txt = bodyText(), hits = 0;
-            for (var i = 0; i < MARKS.length; i++) { if (txt.indexOf(MARKS[i]) >= 0) { hits++; } }
+
+          /**
+           * 这是不是「设置」页。
+           *
+           * **绝不用 innerText**：它会强制一次同步布局（reflow）。以前 observer 每触发一次就
+           * 调一次 innerText，拍题页/详情页那种高频改 DOM 的页面每秒能触发上百次
+           * ⇒ WebView 主线程被 reflow 打满 ⇒ **从子页面返回直接卡死**（2026-11-14 事故）。
+           * textContent 只读已有文本节点，不触发布局。
+           */
+          function looksLikeSettings() {
+            var b = document.body;
+            if (!b) { return false; }
+            var t = b.textContent || '';
+            var hits = 0;
+            for (var i = 0; i < MARKS.length; i++) { if (t.indexOf(MARKS[i]) >= 0) { hits++; } }
             return hits >= 2;
           }
+          /** URL 判据最便宜：设置页是 `zyb://app-vue/page/newSetUp`。 */
+          function urlSaysSettings() {
+            var u = location.href || '';
+            return u.indexOf('newSetUp') >= 0;
+          }
+          function isSettingsPage() { return urlSaysSettings() || looksLikeSettings(); }
+
           function leafByText(t) {
             var all = document.getElementsByTagName('*');
             for (var i = 0; i < all.length; i++) {
@@ -171,9 +189,9 @@ object SettingsEntry : SwitchFeature(
             }
             return null;
           }
+
           /** 复制相邻设置行（同一套 class / 内边距 / 右侧箭头），只把文字换掉。 */
           function insert() {
-            if (document.getElementById(ROW_ID)) { return true; }
             if (!isSettingsPage()) { return false; }
             var anchor = null;
             for (var i = 0; i < MARKS.length && !anchor; i++) { anchor = leafByText(MARKS[i]); }
@@ -205,23 +223,48 @@ object SettingsEntry : SwitchFeature(
             if (row.parentNode) { row.parentNode.insertBefore(mine, row.nextSibling); }
             return true;
           }
-          /**
-           * 常驻重插（2026-11-14）：以前用 30 次定时器，Vue 一旦 diff 重建行就永久消失。
-           * 现在挂 MutationObserver：行不在了就补回来，且只在设置页里动作。
-           */
-          function keep() {
-            if (!isSettingsPage()) { return; }
+
+          /* ── 重插：observer 只挂在「确认是设置页」的时候，且带冷却 ────────── */
+          var lastRun = 0;
+          var pending = false;
+          function ensure() {
+            if (document.getElementById(ROW_ID)) { return; }   // 最便宜的一步，已存在就收工
+            var now = (window.performance && performance.now) ? performance.now() : Date.now();
+            if (now - lastRun < 800) { return; }
+            lastRun = now;
             insert();
           }
-          var t = 0;
-          function boot() { keep(); if (t++ < 20) { setTimeout(boot, 400); } }
-          boot();
-          try {
-            new MutationObserver(function () { keep(); })
-              .observe(document.documentElement, { childList: true, subtree: true });
-          } catch (e) {}
-          setTimeout(keep, 1200);
-          setTimeout(keep, 3000);
+          function schedule() {
+            if (pending) { return; }
+            pending = true;
+            var raf = window.requestAnimationFrame || function (f) { return setTimeout(f, 16); };
+            raf(function () { pending = false; ensure(); });
+          }
+
+          var armed = false;
+          function arm() {
+            if (armed) { return; }
+            armed = true;
+            ensure();
+            try {
+              new MutationObserver(function () {
+                // 行还在就立刻返回（一次 getElementById，不触发布局）
+                if (document.getElementById(ROW_ID)) { return; }
+                schedule();
+              }).observe(document.body, { childList: true, subtree: true });
+            } catch (e) {}
+          }
+
+          /**
+           * 只有设置页才挂 observer。别的页面（拍题、详情、答题）**一次都不挂** ——
+           * 这是"返回必卡死"的根治手段：不再有跨页面的常驻观察者。
+           */
+          var tries = 0;
+          function boot() {
+            if (urlSaysSettings() || looksLikeSettings()) { arm(); return; }
+            if (++tries < 8) { setTimeout(boot, 600); }
+          }
+          setTimeout(boot, 300);
         })();
     """.trimIndent()
 }
