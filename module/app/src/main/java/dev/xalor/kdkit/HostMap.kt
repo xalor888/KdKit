@@ -29,7 +29,7 @@ import dev.xalor.kdkit.util.Xp
  * | `ads.popup.showArg` | `fh.a` | `dh.a` | 3 个抽象方法完全相同（`a(String)`/`b(String)`/`c()Z`），`PopupAdvertisementDialog.g` 的第二个形参就是它 |
  * | `crypto` | `vm.g` | `tm.g` | 28 个方法逐条描述符相同（`h(String)`/`i(String)`/`k(Object)`/`t(Object,Z)`/`o`/`p`/`u`/`z()`）、字段相同（`d` 单例 / `a` 队列 / `b` 密钥 / `c`）；16 条 `RC4Helper` 字符串相同（`updateKey()  key : `、`RC4_DECRYPT_ERROR`） |
  *
- * 宿主角（`features/host/*`，逐条证据与两棵树的门禁输出在 `work/compat1865/HOST.md`）：
+ * 宿主角（`features/host/` 下的功能，逐条证据与两棵树的门禁输出在 `work/compat1865/HOST.md`）：
  *
  * | id | 7.10.2 / 1860 | 6.21.11 / 1865 | 判定依据 |
  * |---|---|---|---|
@@ -86,7 +86,7 @@ object HostMap {
         Rename("ads.slot", "di.a", "bi.a"),
         Rename("ads.popup.showArg", "fh.a", "dh.a"),
         Rename("crypto", "vm.g", "tm.g"),
-        // ── 宿主角（features/host/*；证据逐条见 `work/compat1865/HOST.md`） ─────────────
+        // ── 宿主角（features/host 下；证据逐条见 `work/compat1865/HOST.md`） ─────────────
         // 服务端弹窗总闸门：`PopwinGate.H`（10 个 win* 分支）/ `SkipForceUpdate.L` / `VipPromo.F`。
         Rename("host.popwin", "hh.y", "fh.y"),
         // 强制更新的判定输入：`SkipForceUpdate.k(CheckAppUpdate)`。
