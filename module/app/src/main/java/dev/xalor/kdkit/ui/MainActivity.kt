@@ -1,346 +1,137 @@
 package dev.xalor.kdkit.ui
 
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.clickable
-import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.size
-import androidx.compose.material3.IconButton
-import kotlinx.coroutines.launch
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Block
-import androidx.compose.material.icons.filled.BugReport
-import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.Warning
 import androidx.activity.compose.PredictiveBackHandler
+import androidx.activity.compose.setContent
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.material.icons.filled.BlurOn
-import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material.icons.filled.SettingsBrightness
-import androidx.compose.material3.*
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.unit.sp
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import dev.xalor.kdkit.config.KdConfig
-import dev.xalor.kdkit.features.BaseFeature
-import dev.xalor.kdkit.features.FeatureRegistry
-import dev.xalor.kdkit.ui.theme.KdKitTheme
-import dev.xalor.kdkit.ui.theme.LocalGlass
-import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.basic.SmallTitle
-import top.yukonga.miuix.kmp.basic.TopAppBar
-import top.yukonga.miuix.kmp.preference.ArrowPreference
-import top.yukonga.miuix.kmp.preference.SwitchPreference
+import dev.xalor.kdkit.config.KdConfigBridge
+import dev.xalor.kdkit.ui.theme.KdTheme
 import dev.xalor.kdkit.ui.theme.UiPrefs
-import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import dev.xalor.kdkit.ui.theme.glassCapable
 
 /**
- * 设置页（2026-11-14 发版前重做）。
+ * 唯一 Activity：只做路由（引导 / 设置 / 关于）、主题、返回手势。
  *
- * 改的是什么：**信息的组织方式**，不是功能。
- *  * 38 张独立卡 → **一组一张卡**（分段列表，参照 WeKit 的 `SegmentedColumn` 范式）；
- *  * 长技术副标题 → **一句简明**（`SettingsCopy`），技术说明降级到点击展开区；
- *  * "必须重启" 与 "即时生效" 的自相矛盾 → 顶部说一次 + 行内徽标，不再两处打架；
- *  * 灌满首屏的"配置通道"技术卡 → 缩成状态行里的一个 chip，点开才是诊断对话框；
- *  * 加批量入口：组级"全开/全关"、全量"推荐配置/恢复默认"、关于页。
- *
- * 为什么不改 `BaseFeature.summary`：它同时喂 README 功能表与门禁
- * （`check_feature_parity` 校验 id/热/选项三列）。展示文案与文档文案分开，
- * 改 UI 就不会牵动任何钩子门禁。判据见 `SettingsCopyTest` 与 `module/UI.md`。
+ * 玻璃能力在这里算一次并往下传：`glassCapable()` 为假（模拟器、无 RuntimeShader 的设备）时
+ * 一切玻璃渲染通道都不碰 —— glasmio-glass 的 native 路径在这些机器上会 SIGSEGV。
  */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        KdConfig.attachApp(applicationContext)
+        runCatching { KdConfig.attachApp(applicationContext) }
+        runCatching { KdConfigBridge.startPublisher() }
+
         setContent {
             val ctx = LocalContext.current
             var mode by remember { mutableStateOf(UiPrefs.theme(ctx)) }
             var glass by remember { mutableStateOf(UiPrefs.glass(ctx)) }
-            var backProgress by remember { mutableFloatStateOf(0f) }
             var oobeDone by remember { mutableStateOf(UiPrefs.oobeDone(ctx)) }
-            var showAbout by remember { mutableStateOf(false) }
-            var showDiag by remember { mutableStateOf(false) }
-            var version by remember { mutableStateOf(0) }
+            var about by remember { mutableStateOf(false) }
+            var backProgress by remember { mutableFloatStateOf(0f) }
+            // 能力判断 + 自愈：上次切液态界面崩过，就永久降级（UiPrefs.glassBroken 会顺手落盘）
+            val broken = remember { UiPrefs.glassBroken(ctx) }
+            val capable = glassCapable() && !broken
+            val glassUsable = glass && capable
 
-            // 预测性返回：跟手缩放 + 淡出。`android:enableOnBackInvokedCallback="true"`
-            // 在 Manifest 里开；API 33 以下这个 handler 不会触发，走系统默认返回。
             PredictiveBackHandler(enabled = true) { progress ->
-                runCatching {
-                    progress.collect { backProgress = it.progress }
-                }
+                runCatching { progress.collect { backProgress = it.progress } }
                 backProgress = 0f
                 finish()
             }
-            val scale by animateFloatAsState(1f - 0.06f * backProgress, label = "back-scale")
+            val scale by animateFloatAsState(1f - 0.05f * backProgress, label = "back")
 
-            KdKitTheme(themeMode = mode, glass = glass) {
-                Box(Modifier.graphicsLayer {
-                    scaleX = scale; scaleY = scale
-                    alpha = 1f - 0.18f * backProgress
-                    clip = false
-                }) {
-                    if (!oobeDone) {
-                        Oobe(onDone = { oobeDone = true })
-                        return@Box
-                    }
-                    SettingsScreen(
-                        mode = mode,
-                        glass = glass,
-                        onCycleTheme = {
-                            val next = UiPrefs.next(ctx)
-                            UiPrefs.setTheme(ctx, next)
-                            mode = next
-                        },
-                        onToggleGlass = {
-                            val on = !glass
-                            UiPrefs.setGlass(ctx, on)
-                            glass = on
-                        },
-                        onOpenAbout = { showAbout = true },
-                        onOpenDiag = { showDiag = true },
-                    )
-                }
-            }
-            if (showAbout) AboutDialog(onDismiss = { showAbout = false })
-            if (showDiag) DiagnosticsDialog(version, onDismiss = { showDiag = false }) { version++ }
-        }
-    }
-}
-
-@Composable
-private fun DiagnosticsDialog(version: Int, onDismiss: () -> Unit, onChange: () -> Unit) {
-    val ctx = LocalContext.current
-    val status = remember(version) {
-        val f = File(ctx.filesDir, "kdkit_status.txt")
-        if (f.exists()) runCatching { f.readText() }.getOrDefault("") else ""
-    }
-    val mode = status.lineSequence().firstOrNull { it.startsWith("mode=") }?.removePrefix("mode=")?.trim()
-    val flags = status.lineSequence().firstOrNull { it.startsWith("flags=") }?.removePrefix("flags=")?.trim()
-    val path = status.lineSequence().firstOrNull { it.startsWith("published=") }?.removePrefix("published=")?.trim()
-    val ts = status.lineSequence().firstOrNull { it.startsWith("ts=") }?.removePrefix("ts=")?.trim()?.toLongOrNull()
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("配置通道") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
+            KdTheme(themeMode = mode, glass = glassUsable) {
+                Box(
+                    Modifier.fillMaxSize().graphicsLayer {
+                        scaleX = scale; scaleY = scale
+                        alpha = 1f - 0.16f * backProgress
+                    },
+                ) {
                     when {
-                        status.isEmpty() -> "尚未发布：先在框架里启用模块，再打开一次本应用。"
-                        mode == "644" -> "已发布 $flags 项 · 权限 644（宿主可读）"
-                        else -> "已发布 $flags 项 · 权限 $mode ⚠ 宿主读不到，功能会退回默认值"
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                Text(
-                    "文件：${path ?: "-"}\n权限：${mode ?: "-"}\n时间：${
-                        ts?.let { SimpleDateFormat("MM-dd HH:mm:ss", Locale.US).format(Date(it)) } ?: "-"
-                    }",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    "宿主（快对）与设置应用是不同 uid，宿主只能读这个 world-readable 文件。" +
-                        "本应用重新写偏好时可能把它改成 0660，宿主随即读到空表 —— 一键重发可修复。",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                runCatching {
-                    File(ctx.filesDir, "kdkit_repair.request").writeText(System.currentTimeMillis().toString())
-                }
-                onChange()
-                onDismiss()
-            }) { Text("重新发布（修复权限）") }
-        },
-        dismissButton = {
-            Row {
-                TextButton(onClick = { onChange() }) { Text("刷新") }
-                TextButton(onClick = onDismiss) { Text("关闭") }
-            }
-        },
-    )
-}
-
-/* ───────────────────────── 关于（版本 / 作者 / 检查更新） ───────────────────────── */
-
-private const val REPO_OWNER = "xalor888"
-private const val REPO_NAME = "KdKit"
-private const val REPO_URL = "https://github.com/$REPO_OWNER/$REPO_NAME"
-private const val RELEASES_URL = "$REPO_URL/releases"
-private const val API_LATEST = "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/releases/latest"
-
-/** GitHub release JSON 里的 tag 提取 —— 编译期构造一次（门禁 ⑲ 把语句位置正则算作热路径）。 */
-/** 把 "v1.3.2" / "1.3.2-beta" 拆成数字段。 */
-private fun versionParts(raw: String): List<Int> =
-    raw.trim().removePrefix("v").removePrefix("V").substringBefore('-')
-        .split('.').map { it.toIntOrNull() ?: 0 }
-
-/** 远端 a 是否**严格大于**本地 b（逐段比较，缺段补 0）。 */
-private fun semverGreater(a: String, b: String): Boolean {
-    val pa = versionParts(a)
-    val pb = versionParts(b)
-    for (i in 0 until maxOf(pa.size, pb.size)) {
-        val x = pa.getOrNull(i) ?: 0
-        val y = pb.getOrNull(i) ?: 0
-        if (x != y) return x > y
-    }
-    return false
-}
-
-private val TAG_RE = Regex("\"tag_name\"\\s*:\\s*\"([^\"]+)\"")
-
-private sealed interface UpdateState {
-    data object Checking : UpdateState
-    data object Latest : UpdateState
-    data class Newer(val tag: String) : UpdateState
-    data class Failed(val why: String) : UpdateState
-}
-
-/** 拉 GitHub 最新 release 的 tag（不引入网络库：一次 GET + 正则）。 */
-private fun fetchLatestTag(): String? {
-    // 1) GitHub API（国外网络首选）
-    runCatching {
-        val conn = (java.net.URL(API_LATEST).openConnection() as java.net.HttpURLConnection).apply {
-            requestMethod = "GET"; connectTimeout = 5000; readTimeout = 5000
-            setRequestProperty("Accept", "application/vnd.github+json")
-            setRequestProperty("User-Agent", "KdKit-Android")
-        }
-        try {
-            if (conn.responseCode in 200..299) TAG_RE.find(conn.inputStream.bufferedReader().use { it.readText() })
-                ?.groupValues?.get(1) else null
-        } finally { conn.disconnect() }
-    }.getOrNull()?.let { return it }
-
-    // 2) 回退：releases/latest 的 302（国内多数网络能到，API 常被挡）
-    return runCatching {
-        val conn = (java.net.URL("https://github.com/$REPO_OWNER/KdKit/releases/latest")
-            .openConnection() as java.net.HttpURLConnection).apply {
-            instanceFollowRedirects = false; connectTimeout = 8000; readTimeout = 8000
-            setRequestProperty("User-Agent", "KdKit-Android")
-        }
-        try {
-            val loc = conn.getHeaderField("Location") ?: return@runCatching null
-            loc.trimEnd('/').substringAfterLast('/').takeIf { it.isNotEmpty() }
-        } finally { conn.disconnect() }
-    }.getOrNull()
-}
-
-private fun openUrl(ctx: android.content.Context, url: String) {
-    runCatching {
-        ctx.startActivity(
-            android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
-                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-        )
-    }
-}
-
-@Composable
-private fun AboutDialog(onDismiss: () -> Unit) {
-    val ctx = LocalContext.current
-    val selfVer = remember {
-        runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName ?: "?" }
-            .getOrDefault("?")
-    }
-    var state by remember { mutableStateOf<UpdateState>(UpdateState.Checking) }
-
-    // 打开关于页就自动检查一次更新。
-    LaunchedEffect(Unit) {
-        state = runCatching {
-            val tag: String? = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { fetchLatestTag() }
-            if (tag == null) {
-                UpdateState.Failed("连不上 GitHub，稍后再试")
-            } else {
-                // 只按语义比较：远端**严格大于**本地才提示。
-                // 以前是 `tag.trimStart('v','V') == selfVer` —— 任何"不相等"都报"有新版本"，
-                // 于是本地 1.3.3 也会被提示"更新到 1.3.2"（2026-11-14 实测反馈）。
-                if (semverGreater(tag, selfVer)) UpdateState.Newer(tag) else UpdateState.Latest
-            }
-        }.getOrElse { UpdateState.Failed(it.message ?: "检查失败") }
-    }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("关于 KdKit") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("版本 $selfVer · MIT License", style = MaterialTheme.typography.bodyMedium)
-                Text(
-                    "适配基线 快对 ${dev.xalor.kdkit.HostVersion.BASELINE_VERSION_NAME}" +
-                        "（${dev.xalor.kdkit.HostVersion.BASELINE_VERSION_CODE}），兼容 7.10.0 / 7.9.0。",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                HorizontalDivider(Modifier.padding(vertical = 4.dp))
-                Text(
-                    when (val st = state) {
-                        UpdateState.Checking -> "正在检查更新…"
-                        UpdateState.Latest -> "已是最新版本"
-                        is UpdateState.Newer -> "有新版本 ${st.tag}"
-                        is UpdateState.Failed -> "检查更新失败：${st.why}"
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = when (state) {
-                        is UpdateState.Newer -> MaterialTheme.colorScheme.primary
-                        is UpdateState.Failed -> MaterialTheme.colorScheme.error
-                        else -> MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                )
-                if (state is UpdateState.Newer) {
-                    TextButton(onClick = { openUrl(ctx, RELEASES_URL) }) {
-                        Text("打开发布页下载")
+                        // 关于/更新页排在降级判断之前 —— 否则 !capable 分支永远先命中，点「关于」没反应
+                        !capable && about -> LegacyAbout(onBack = { about = false })
+                        Build.VERSION.SDK_INT < 33 -> LegacyPage(
+                            mode = mode, glass = glassUsable,
+                            onCycleTheme = {
+                                val next = UiPrefs.next(ctx); UiPrefs.setTheme(ctx, next); mode = next
+                            },
+                            onToggleGlass = { val on = !glass; UiPrefs.setGlass(ctx, on); glass = on },
+                            onOpenAbout = { about = true },
+                        )
+                        !capable -> LegacyPage(
+                            mode = mode, glass = glassUsable,
+                            onCycleTheme = {
+                                val next = UiPrefs.next(ctx); UiPrefs.setTheme(ctx, next); mode = next
+                            },
+                            onToggleGlass = { val on = !glass; UiPrefs.setGlass(ctx, on); glass = on },
+                            onOpenAbout = { about = true },
+                        )
+                        !oobeDone -> GlasmioGate(
+                            { UiPrefs.markGlassPending(ctx) },
+                            { UiPrefs.confirmGlass(ctx) },
+                        ) {
+                            OobeFlow(glass = glassUsable, onDone = { oobeDone = true })
+                        }
+                        about -> GlasmioGate(
+                            { UiPrefs.markGlassPending(ctx) },
+                            { UiPrefs.confirmGlass(ctx) },
+                        ) { AboutPage(onBack = { about = false }, glass = glassUsable) }
+                        else -> GlasmioGate(
+                            { UiPrefs.markGlassPending(ctx) },
+                            { UiPrefs.confirmGlass(ctx) },
+                        ) {
+                        SettingsPage(
+                            mode = mode, glass = glassUsable,
+                            onCycleTheme = {
+                                val next = UiPrefs.next(ctx); UiPrefs.setTheme(ctx, next); mode = next
+                            },
+                            onToggleGlass = { val on = !glass; UiPrefs.setGlass(ctx, on); glass = on },
+                            onOpenAbout = { about = true },
+                        )
+                        }
                     }
                 }
-                HorizontalDivider(Modifier.padding(vertical = 4.dp))
-                Text("作者 xalor", style = MaterialTheme.typography.bodySmall)
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    TextButton(onClick = { openUrl(ctx, REPO_URL) }) { Text("项目主页") }
-                    TextButton(onClick = { openUrl(ctx, RELEASES_URL) }) { Text("全部版本") }
-                }
             }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("关闭") } },
-    )
+        }
+    }
+}
+
+/**
+ * 液态界面护栏：进页面先落 `pending`，等真正画出两帧再落 `ok`。
+ *
+ * 下一次启动如果 `pending` 还在（说明上次正是在这里死掉的），[UiPrefs.glassBroken]
+ * 会把它判成 `broken`，于是这台机器以后都走普通界面 —— 用户不需要手动处理。
+ *
+ * 为什么是"两帧"：Compose 的第一帧只做测量/布局，真正提交到 RenderThread 的是下一帧；
+ * native 崩溃几乎都发生在提交阶段，所以必须等到第二帧再确认。
+ */
+@Composable
+private fun GlasmioGate(
+    onPending: () -> Unit,
+    onConfirmed: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    LaunchedEffect(onPending) { onPending() }
+    LaunchedEffect(Unit) {
+        withFrameNanos { }
+        withFrameNanos { }
+        onConfirmed()
+    }
+    content()
 }

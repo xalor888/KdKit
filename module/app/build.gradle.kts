@@ -3,7 +3,6 @@ import java.util.Properties
 
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
@@ -91,25 +90,19 @@ android {
 
 dependencies {
     compileOnly(files("../libs/XposedBridgeApi-82.jar"))
-
     testImplementation("junit:junit:4.13.2")
 
-    // JetBrains Compose Multiplatform 依赖（Android 端映射到 androidx.compose）。
-    // 不走 BOM：miuix 0.9.x 是 CMP 产物，版本必须与它声明的 CMP 对齐，
-    // 否则会同时解析出两套 compose runtime（表现为 NoSuchMethodError 或静默崩溃）。
-    implementation("org.jetbrains.compose.ui:ui:1.11.1")
-    implementation("org.jetbrains.compose.foundation:foundation:1.11.1")
-    implementation("androidx.compose.material3:material3:1.4.0")
-    implementation("androidx.compose.material:material-icons-extended:1.7.3")
-    implementation("androidx.compose.ui:ui-graphics:1.7.3")
-    // Miuix 0.9.3（新代拆分模块）：SwitchPreference / ArrowPreference / SmallTitle /
-    // TopAppBar / Scaffold / NavigationBar。需要 Kotlin 2.3.21+ 与 compileSdk 37。
-    implementation("top.yukonga.miuix.kmp:miuix-ui:0.9.3")
-    // 真·液态玻璃（HyperChanger 同款）：背景实时模糊 + vibrancy，不是自己画的假透明
-    implementation("io.github.kyant0:backdrop:2.0.0")
-    implementation("io.github.kyant0:shapes:1.2.0")
-    implementation("top.yukonga.miuix.kmp:miuix-preference:0.9.3")
-    implementation("androidx.activity:activity-compose:1.9.3")
+    implementation(platform("androidx.compose:compose-bom:2026.09.00"))
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.foundation:foundation")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-extended")
+
+    implementation("io.github.neoruaa.glasmio:glasmio-ui:0.1.3")
+    implementation("io.github.neoruaa.glasmio:glasmio-preference:0.1.3")
+    implementation("io.github.neoruaa.glasmio:glasmio-icons:0.1.3")
+
+    implementation("androidx.activity:activity-compose:1.13.0")
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
 }

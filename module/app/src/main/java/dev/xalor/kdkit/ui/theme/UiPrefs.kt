@@ -25,6 +25,42 @@ object UiPrefs {
 
     private fun prefs(ctx: Context) = ctx.getSharedPreferences(NAME, Context.MODE_PRIVATE)
 
+    /* ── Glasmio 液态玻璃 UI 的自愈开关 ────────────────────────────────────
+     *
+     * glasmio-glass 的渲染依赖 Skia RuntimeEffect，**模拟器/部分弱 GPU 上会直接
+     * 在 RenderThread 里 SIGSEGV**（不是抛异常，抓不到）。所以这里做"先试后定"：
+     *   1. 切到液态界面前置 `pending`；
+     *   2. 真正画出两帧后置 `ok`；
+     *   3. 下次启动如果看到 `pending` 还在 → 说明上次就是死在那里的，标记 `broken`，
+     *      这次直接用普通界面。
+     * 用户在真机上只要成功显示过一次，之后就一直用液态界面；在会崩的机器上则自动降级，
+     * 不需要人肉判断。
+     */
+    private const val KEY_GLASS_STATE = "glass_state"
+    private const val GLASS_PENDING = "pending"
+    private const val GLASS_OK = "ok"
+    private const val GLASS_BROKEN = "broken"
+
+    fun glassState(ctx: Context): String = prefs(ctx).getString(KEY_GLASS_STATE, "") ?: ""
+
+    fun markGlassPending(ctx: Context) {
+        prefs(ctx).edit().putString(KEY_GLASS_STATE, GLASS_PENDING).apply()
+    }
+
+    fun confirmGlass(ctx: Context) {
+        prefs(ctx).edit().putString(KEY_GLASS_STATE, GLASS_OK).apply()
+    }
+
+    /** 上次启动留下 pending → 判定这台机器画不了液态玻璃。 */
+    fun glassBroken(ctx: Context): Boolean {
+        val st = glassState(ctx)
+        if (st == GLASS_PENDING) {
+            prefs(ctx).edit().putString(KEY_GLASS_STATE, GLASS_BROKEN).apply()
+            return true
+        }
+        return st == GLASS_BROKEN
+    }
+
     fun theme(ctx: Context): String =
         prefs(ctx).getString(KEY_THEME, THEME_AUTO) ?: THEME_AUTO
 

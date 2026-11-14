@@ -1,7 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Glasmio 声明 minSdk 33；模块整体是 26。运行时按 SDK_INT 分流，
+         低于 33 走不碰 Glasmio 的降级界面（ui/LegacyPage.kt）。 -->
+    <uses-sdk tools:overrideLibrary="io.github.neoruaa.glasmio.core,io.github.neoruaa.glasmio.glass,io.github.neoruaa.glasmio.ui,io.github.neoruaa.glasmio.icons,io.github.neoruaa.glasmio.preference" />
 
     <application
         android:allowBackup="false"
