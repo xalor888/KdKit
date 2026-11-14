@@ -221,3 +221,40 @@ RRO 资源覆盖，风险是崩溃面 —— 本模块只做**看感四件套**�
 - 0.9.4 仍被 AGP 9.1 门槛挡住（`checkDebugAarMetadata` 实测），因此停在 **0.9.3**（PoC 里 0.9.3 + Kotlin 2.3.21 +
   CMP 1.11.1 + compileSdk 37 实测 `BUILD SUCCESSFUL`）。
 - `miuix-blur` / `miuix-glass` 未在 Maven 发布（或 minSdk 33），所以玻璃仍是自绘 —— 但这次是**真模糊**（`RenderEffect`），不是纯半透明。
+
+
+## 14. 黑屏与 miuix 落地（v1.5）
+
+### 14.1 「打开就黑屏」的机制（真机反馈后定位）
+
+两个原因叠在一起，恰好都在**新系统**上暴露：
+
+1. `Surface(color = Color.Transparent)` + 自绘背景 `Canvas`：只要背景那一层没画出来
+   （新系统渲染后端差异 / `RenderEffect` 不可用），整页就是纯黑 —— 因为窗口本身没有底色。
+2. 玻璃卡里的 `BlurEffect`（`RenderEffect`）是唯一"平台差异大"的绘制特性。
+
+修法：
+
+* 根节点先铺**不透明**底色（`Scaffold containerColor` 与 `Surface color` 都给了实色），
+  任何绘制失败都退化成"纯色页面"而不是黑屏；
+* **移除 `BlurEffect`**，玻璃改用"晕染渐变 + 高光边"表达（视觉差异小，稳定性差异大）。
+
+### 14.2 真正的 miuix（不是只换开关）
+
+换的是**整套骨架**，不是只把 `Switch` 换成 `SwitchPreference`：
+
+| 位置 | 组件 |
+|---|---|
+| 页面骨架 | `top.yukonga.miuix.kmp.basic.Scaffold` |
+| 列表行 | `top.yukonga.miuix.kmp.preference.SwitchPreference` |
+| 分组卡 | `top.yukonga.miuix.kmp.basic.Card`（`cornerRadius = 22.dp`，与 HyperOS 一致） |
+| 主题/色板 | `top.yukonga.miuix.kmp.theme.MiuixTheme` + `lightColorScheme/darkColorScheme` |
+
+`TopAppBar` 试过但**没有采用**：无 `scrollBehavior` 时它只渲染 subtitle，大标题整块不显示
+（实测截图 `work/mx_light2.png`），所以大标题改为列表首项 + 右上三个操作按钮，更可靠。
+
+### 14.3 深色模式
+
+三档（跟随系统 / 浅色 / 深色）由 `UiPrefs` 持久化，`MiuixTheme` 随之切 `darkColorScheme`。
+实测：`主题：跟随系统` + 系统 `cmd uimode night no` → 浅色（`work/mx_light_true.png`）；
+`主题：深色` → 深色（`work/mx_final_light.png`）。

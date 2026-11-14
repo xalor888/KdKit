@@ -1,6 +1,5 @@
 package dev.xalor.kdkit.ui
 
-import android.os.Build
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -15,12 +14,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.TileMode
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.xalor.kdkit.ui.theme.LocalGlass
@@ -85,7 +81,8 @@ fun GlassBackground(
  *
  * 结构（自下而上）：
  *  1. 背景层：渐变填充 + 两团彩色光斑（这是"液态"的颜色来源）；
- *  2. 模糊层：对 1 施加 [BlurEffect]（API 31+；低版本自动退化成不糊，视觉仍成立）；
+ *  2. （原先这里有一层 [BlurEffect] 模糊，2026-11-14 移除：在 Android 17 上它会让整页黑屏——
+ *     渲染后端拿不到 RenderEffect 时连底色都不画。现在改用「晕染渐变本身够柔和」的等价做法。）
  *  3. 高光边：上亮下暗的 1dp 渐变描边，模拟玻璃边缘；
  *  4. 内容层。
  *
@@ -135,36 +132,6 @@ fun GlassCard(
                     radius = size.maxDimension * 0.85f,
                     center = Offset(size.width * 0.95f, size.height),
                 )
-            }
-            // 2) 模糊层（只糊上面那层绘制，不糊内容）
-            Box(
-                Modifier.matchParentSize().graphicsLayer {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                        renderEffect = BlurEffect(blurPx, blurPx, TileMode.Clamp)
-                    }
-                },
-            ) {
-                Canvas(Modifier.matchParentSize()) {
-                    drawRect(Brush.verticalGradient(listOf(g.cardFillTop, g.cardFillBottom)))
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            colors = listOf(g.cardTint1, Color.Transparent),
-                            center = Offset(size.width * 0.12f, 0f),
-                            radius = size.maxDimension * 0.9f,
-                        ),
-                        radius = size.maxDimension * 0.9f,
-                        center = Offset(size.width * 0.12f, 0f),
-                    )
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            colors = listOf(g.cardTint2, Color.Transparent),
-                            center = Offset(size.width * 0.95f, size.height),
-                            radius = size.maxDimension * 0.85f,
-                        ),
-                        radius = size.maxDimension * 0.85f,
-                        center = Offset(size.width * 0.95f, size.height),
-                    )
-                }
             }
             // 3) 高光边
             Box(

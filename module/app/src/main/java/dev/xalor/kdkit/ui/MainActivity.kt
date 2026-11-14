@@ -61,7 +61,10 @@ import dev.xalor.kdkit.features.BaseFeature
 import dev.xalor.kdkit.features.FeatureRegistry
 import dev.xalor.kdkit.ui.theme.KdKitTheme
 import dev.xalor.kdkit.ui.theme.LocalGlass
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTitle
+import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import dev.xalor.kdkit.ui.theme.UiPrefs
@@ -107,7 +110,13 @@ class MainActivity : ComponentActivity() {
             val scale by animateFloatAsState(1f - 0.06f * backProgress, label = "back-scale")
 
             KdKitTheme(themeMode = mode, glass = glass) {
-                Surface(modifier = Modifier.fillMaxSize(), color = Color.Transparent) {
+                // 关键：先铺一层**不透明**底色，再叠玻璃背景。
+                // 以前这里是 Transparent Surface：一旦背景 Canvas 没画出来（新系统渲染差异），
+                // 整页就是纯黑 —— 这就是「打开 KdKit 直接黑屏」的机制。
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = if (LocalGlass.current.isDark) Color(0xFF0B0D14) else Color(0xFFEDEFF7),
+                ) {
                     GlassBackground {
                         Box(Modifier.graphicsLayer {
                             scaleX = scale; scaleY = scale
@@ -185,7 +194,8 @@ private fun SettingsScreen(
     }
 
     Scaffold(
-        containerColor = Color.Transparent,
+        // 不透明底：透明容器 + 绘制失败 = 整页黑屏（Android 17 上就是这样）。
+        containerColor = if (LocalGlass.current.isDark) Color(0xFF0B0D14) else Color(0xFFEDEFF7),
         bottomBar = {
             if (!searching) {
                 GlassBottomBar(glass) { g ->
@@ -194,50 +204,7 @@ private fun SettingsScreen(
             }
         },
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
-        topBar = {
-            LargeTopAppBar(
-                title = {
-                    Column {
-                        Text("KdKit", fontWeight = FontWeight.Bold)
-                        Text(
-                            "已启用 $enabledCount / ${all.size} · 快对 ${dev.xalor.kdkit.HostVersion.BASELINE_VERSION_NAME}",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.largeTopAppBarColors(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = Color.Transparent,
-                ),
-                actions = {
-                    IconButton(onClick = onCycleTheme) {
-                        Icon(
-                            when (mode) {
-                                UiPrefs.THEME_DARK -> Icons.Default.DarkMode
-                                UiPrefs.THEME_LIGHT -> Icons.Default.LightMode
-                                else -> Icons.Default.SettingsBrightness
-                            },
-                            contentDescription = "主题：${UiPrefs.label(mode)}",
-                            tint = LocalGlass.current.onCard,
-                        )
-                    }
-                    IconButton(onClick = onToggleGlass) {
-                        Icon(
-                            Icons.Default.BlurOn,
-                            contentDescription = if (glass) "液态玻璃：开" else "液态玻璃：关",
-                            tint = if (glass) LocalGlass.current.accent else LocalGlass.current.onCardMuted,
-                        )
-                    }
-                    TextButton(onClick = { showAbout = true }) {
-                        Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.width(18.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text("关于")
-                    }
-                },
-                scrollBehavior = scroll,
-            )
-        },
+        topBar = {},
     ) { padding ->
         LazyColumn(
             state = listState,
@@ -245,6 +212,47 @@ private fun SettingsScreen(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 104.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            item(key = "title") {
+                Column(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "KdKit",
+                            style = MaterialTheme.typography.headlineLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = LocalGlass.current.onCard,
+                        )
+                        Spacer(Modifier.weight(1f))
+                        IconButton(onClick = onCycleTheme) {
+                            Icon(
+                                when (mode) {
+                                    UiPrefs.THEME_DARK -> Icons.Default.DarkMode
+                                    UiPrefs.THEME_LIGHT -> Icons.Default.LightMode
+                                    else -> Icons.Default.SettingsBrightness
+                                },
+                                contentDescription = "主题：${UiPrefs.label(mode)}",
+                                tint = LocalGlass.current.onCard,
+                            )
+                        }
+                        IconButton(onClick = onToggleGlass) {
+                            Icon(
+                                Icons.Default.BlurOn,
+                                contentDescription = if (glass) "液态玻璃：开" else "液态玻璃：关",
+                                tint = if (glass) LocalGlass.current.accent else LocalGlass.current.onCardMuted,
+                            )
+                        }
+                        IconButton(onClick = { showAbout = true }) {
+                            Icon(Icons.Default.Info, contentDescription = "关于", tint = LocalGlass.current.onCard)
+                        }
+                    }
+                    Text(
+                        "已启用 $enabledCount / ${all.size} · 快对 " +
+                            dev.xalor.kdkit.HostVersion.BASELINE_VERSION_NAME,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = LocalGlass.current.onCardMuted,
+                    )
+                }
+            }
+
             item { StatusLine(health) { showDiag = true } }
 
             item {
@@ -493,10 +501,9 @@ private fun FeatureCard(
     glass: Boolean,
     onChange: () -> Unit,
 ) {
-    GlassCard(
+    Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
-        glassOff = !glass,
+        cornerRadius = 22.dp,
     ) {
         Column {
             features.forEachIndexed { i, f ->
