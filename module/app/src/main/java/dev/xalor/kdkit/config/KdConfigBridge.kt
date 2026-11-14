@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import de.robv.android.xposed.XSharedPreferences
 import de.robv.android.xposed.XposedBridge
+import dev.xalor.kdkit.util.KdLog
 import android.system.Os
 import java.io.File
 
@@ -47,10 +48,10 @@ object KdConfigBridge {
         val prefs = try {
             XSharedPreferences(KdConfig.MODULE_PKG, KdConfig.PREFS_NAME).also {
                 it.reload()
-                XposedBridge.log("[KdKit] xprefs published=${it.file?.absolutePath} all=${it.all}")
+                KdLog.i("[KdKit] xprefs published=${it.file?.absolutePath} all=${it.all}")
             }
         } catch (t: Throwable) {
-            XposedBridge.log("[KdKit] XSharedPreferences unavailable: $t")
+            KdLog.i("[KdKit] XSharedPreferences unavailable: $t")
             null
         } ?: return
 
@@ -73,7 +74,7 @@ object KdConfigBridge {
                         prefs.reload()
                     }
                 } catch (t: Throwable) {
-                    XposedBridge.log("[KdKit] prefs refresh failed: $t")
+                    KdLog.i("[KdKit] prefs refresh failed: $t")
                 }
                 handler.postDelayed(this, 500)
             }
@@ -101,24 +102,24 @@ object KdConfigBridge {
             null
         }
         if (app == null) {
-            XposedBridge.log("[KdKit] publisher: no application context yet")
+            KdLog.i("[KdKit] publisher: no application context yet")
             return
         }
         val publish = try {
             XSharedPreferences(KdConfig.MODULE_PKG, KdConfig.PREFS_NAME).file
         } catch (t: Throwable) {
-            XposedBridge.log("[KdKit] publisher: cannot resolve publish path: $t")
+            KdLog.i("[KdKit] publisher: cannot resolve publish path: $t")
             return
         } ?: return
 
         val prefs = app.getSharedPreferences(KdConfig.PREFS_NAME, Context.MODE_PRIVATE)
         publishPrefs = prefs
         val file = File(File(app.dataDir, "shared_prefs"), "${KdConfig.PREFS_NAME}.xml")
-        XposedBridge.log(
+        KdLog.i(
             "[KdKit] publisher: ctx=${app.packageName} dataDir=${app.dataDir} " +
                 "prefsFile=${file.exists()} (${file.length()} B) map=${prefs.all.size}"
         )
-        XposedBridge.log("[KdKit] publisher path = ${publish.absolutePath}")
+        KdLog.i("[KdKit] publisher path = ${publish.absolutePath}")
 
         // If the in-memory map is empty but the file on disk is not, the process is reading a
         // different pref store than the one the UI wrote (seen on 2026-10-11: "published 0
@@ -129,7 +130,7 @@ object KdConfigBridge {
         if (snapshot.isEmpty()) {
             val fromDisk = readBooleanPrefs(file)
             if (fromDisk.isNotEmpty()) {
-                XposedBridge.log("[KdKit] publisher: in-memory map empty, using ${fromDisk.size} flag(s) from ${file.absolutePath}")
+                KdLog.i("[KdKit] publisher: in-memory map empty, using ${fromDisk.size} flag(s) from ${file.absolutePath}")
                 snapshot = fromDisk
             }
         }
@@ -153,13 +154,13 @@ object KdConfigBridge {
                 .mapNotNull { (k, v) -> if (k.startsWith("_")) null else (v as? Boolean)?.let { k to it } }
                 .toMap()
             if (changed != null && changed.startsWith("_")) {
-                XposedBridge.log("[KdKit] publisher: request '$changed' -> republish")
+                KdLog.i("[KdKit] publisher: request '$changed' -> republish")
             }
             publish(flags, publish)
         }
         changeListener = listener                  // ← 强引用，别删
         prefs.registerOnSharedPreferenceChangeListener(listener)
-        XposedBridge.log("[KdKit] publisher: change listener registered (strong ref held)")
+        KdLog.i("[KdKit] publisher: change listener registered (strong ref held)")
     }
 
     /**
@@ -197,7 +198,7 @@ object KdConfigBridge {
                         val mode = Os.stat(target.absolutePath).st_mode and 0x1FF
                         if (mode != 0x1A4) {
                             Os.chmod(target.absolutePath, 0x1A4)
-                            XposedBridge.log("[KdKit] publisher: repaired mode ${"%o".format(mode)} -> 644")
+                            KdLog.i("[KdKit] publisher: repaired mode ${"%o".format(mode)} -> 644")
                         }
                     }
                     val req = repairRequest
@@ -206,7 +207,7 @@ object KdConfigBridge {
                         if (token.isNotEmpty() && token != lastRequest) {
                             lastRequest = token
                             readBooleanPrefs(target).takeIf { it.isNotEmpty() }?.let { flags = it }
-                            XposedBridge.log("[KdKit] publisher: republish requested ($token)")
+                            KdLog.i("[KdKit] publisher: republish requested ($token)")
                             publish(flags, target, stringSnapshot(publishPrefs))
                         }
                     }
@@ -224,7 +225,7 @@ object KdConfigBridge {
                         if (live.isNotEmpty() && live != flags) {
                             flags = live
                             publish(flags, target, stringSnapshot(publishPrefs))
-                            XposedBridge.log(
+                            KdLog.i(
                                 "[KdKit] publisher: 对账发现 ${live.size} 个开关与已发布内容不同，已重发",
                             )
                         }
@@ -234,7 +235,7 @@ object KdConfigBridge {
                 try { Thread.sleep(2000) } catch (_: InterruptedException) { return@Thread }
             }
         }, "KdKit-prefs-repair").apply { isDaemon = true }.start()
-        XposedBridge.log("[KdKit] publisher: mode repair watchdog started")
+        KdLog.i("[KdKit] publisher: mode repair watchdog started")
 
         // 每 5 分钟一次心跳：把"监听器还在不在、触发过几次"写进日志。
         // 为什么需要：`SharedPreferences` 对监听器只存弱引用，一旦被回收，
@@ -242,7 +243,7 @@ object KdConfigBridge {
         Thread({
             while (true) {
                 try { Thread.sleep(300_000) } catch (_: InterruptedException) { return@Thread }
-                XposedBridge.log(
+                KdLog.i(
                     "[KdKit] publisher heartbeat: listenerAlive=${listenerAlive()} fires=$changeListenerFires",
                 )
             }
@@ -254,10 +255,10 @@ object KdConfigBridge {
         try {
             Os.chmod(file.absolutePath, 0x1A4 /* 0644 */)
         } catch (t: Throwable) {
-            XposedBridge.log("[KdKit] publisher: chmod failed: $t")
+            KdLog.i("[KdKit] publisher: chmod failed: $t")
         }
         try {
-            if (!file.canRead()) XposedBridge.log("[KdKit] publisher: file still unreadable")
+            if (!file.canRead()) KdLog.i("[KdKit] publisher: file still unreadable")
         } catch (_: Throwable) {}
     }
 
@@ -278,7 +279,7 @@ object KdConfigBridge {
                     "ts=" + System.currentTimeMillis() + "\n"
             )
         } catch (t: Throwable) {
-            XposedBridge.log("[KdKit] publisher: status write failed: $t")
+            KdLog.i("[KdKit] publisher: status write failed: $t")
         }
     }
 
@@ -333,7 +334,7 @@ object KdConfigBridge {
                 .filter { !it.groupValues[1].startsWith("_") }   // meta keys never go to the host
                 .associate { it.groupValues[1] to (it.groupValues[2] == "true") }
         } catch (t: Throwable) {
-            XposedBridge.log("[KdKit] publisher: file parse failed: $t")
+            KdLog.i("[KdKit] publisher: file parse failed: $t")
             emptyMap()
         }
     }
@@ -356,10 +357,10 @@ object KdConfigBridge {
             // default (found 2026-10-11: file was 0660 -> host logged "all={}").
             makeWorldReadable(target)
             val mode = try { "%o".format(Os.stat(target.absolutePath).st_mode and 0x1ff) } catch (t: Throwable) { "?" }
-            XposedBridge.log("[KdKit] published ${flags.size} flag(s) + ${strings.size} string(s) mode=$mode -> $target")
+            KdLog.i("[KdKit] published ${flags.size} flag(s) + ${strings.size} string(s) mode=$mode -> $target")
             writeStatus(flags, target, mode)
         } catch (t: Throwable) {
-            XposedBridge.log("[KdKit] publish failed: $t")
+            KdLog.i("[KdKit] publish failed: $t")
         }
     }
 
