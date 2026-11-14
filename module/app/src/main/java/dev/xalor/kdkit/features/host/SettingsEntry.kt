@@ -153,8 +153,8 @@ object SettingsEntry : SwitchFeature(
           window.__kdkit_settings_entry = 1;
           var ROW_ID = 'kdkit-settings-row';
           var LABEL = '$ROW_LABEL';
-          var MARKS = ['第三方信息共享清单', '个人信息收集清单', '撤回同意隐私政策',
-                       '系统权限列表', '问题诊断', '图标设置'];
+          var MARKS = ['检查新版本', '第三方信息共享清单', '个人信息收集清单',
+                       '撤回同意隐私政策', '系统权限列表', '问题诊断', '图标设置'];
           function norm(s) { return (s || '').replace(/[\s\u00a0]+/g, ''); }
 
           /**
@@ -180,22 +180,34 @@ object SettingsEntry : SwitchFeature(
           }
           function isSettingsPage() { return urlSaysSettings() || looksLikeSettings(); }
 
+          /**
+           * 找"文案正好是 t"的最深元素。
+           *
+           * 原来只接受 `children.length <= 2`：快对的设置行是「图标 + 文案 + 右箭头」三个子节点，
+           * 于是永远匹配不到，行就插不进去（2026-11-15 在模拟器上实测：注入成功但行不出现）。
+           * 现在放宽到 8 个子节点，并额外要求整块文本长度接近 t（避免把整页容器当命中）。
+           */
           function leafByText(t) {
             var all = document.getElementsByTagName('*');
+            var want = norm(t);
+            var best = null;
             for (var i = 0; i < all.length; i++) {
               var el = all[i];
-              if (el.children.length > 2) { continue; }
-              if (norm(el.textContent) === t) { return el; }
+              if (el.children.length > 8) { continue; }
+              var txt = norm(el.textContent);
+              if (txt === want) { return el; }               // 精确命中直接返回
+              if (!best && txt.length > want.length && txt.length < want.length + 6 &&
+                  txt.indexOf(want) === 0) { best = el; }   // 允许"文案 + 箭头字符"
             }
-            return null;
+            return best;
           }
 
           /** 复制相邻设置行（同一套 class / 内边距 / 右侧箭头），只把文字换掉。 */
           function insert() {
-            if (!isSettingsPage()) { return false; }
+            if (!isSettingsPage()) { console.log('[KdKit] insert: not settings'); return false; }
             var anchor = null;
             for (var i = 0; i < MARKS.length && !anchor; i++) { anchor = leafByText(MARKS[i]); }
-            if (!anchor) { return false; }
+            if (!anchor) { console.log('[KdKit] insert: no anchor'); return false; }
             var row = anchor;
             while (row.parentNode && norm(row.parentNode.textContent) === norm(anchor.textContent)) {
               row = row.parentNode;
@@ -221,6 +233,7 @@ object SettingsEntry : SwitchFeature(
             mine.addEventListener('pointerdown', go, true);
             mine.addEventListener('click', go, true);
             if (row.parentNode) { row.parentNode.insertBefore(mine, row.nextSibling); }
+            console.log('[KdKit] insert: row added, parent=' + (row.parentNode && row.parentNode.tagName));
             return true;
           }
 
