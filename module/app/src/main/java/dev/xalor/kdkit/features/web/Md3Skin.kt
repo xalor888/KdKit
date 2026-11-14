@@ -235,6 +235,16 @@ object Md3Skin : SwitchFeature(
             append("    html,body,#app,#__nuxt,#root,body>div,[class*=\"page\"],[class*=\"Page\"],")
             append("[class*=\"root\"],[class*=\"Root\"]{background:var(--kdkit-surface)!important;")
             append("color:var(--kdkit-on-surface)!important;}\n")
+            // 液态玻璃的前提：背景得有色彩变化。纯色底上 backdrop-blur 永远是"看不见的"。
+            append("    body{background-image:")
+            if (dark) {
+                append("radial-gradient(60% 40% at 12% 6%, rgba(91,107,192,.30) 0%, transparent 60%),")
+                append("radial-gradient(50% 36% at 92% 62%, rgba(124,107,224,.26) 0%, transparent 62%)")
+            } else {
+                append("radial-gradient(60% 40% at 10% 4%, rgba(146,164,255,.30) 0%, transparent 62%),")
+                append("radial-gradient(52% 38% at 92% 58%, rgba(255,206,150,.28) 0%, transparent 64%)")
+            }
+            append("!important;background-attachment:fixed!important;}\n")
             append("    body{font-family:\"Noto Sans SC\",\"HarmonyOS Sans SC\",system-ui,-apple-system,sans-serif!important;}\n")
             append("    [class*=\"card\"],[class*=\"Card\"],[class*=\"panel\"],[class*=\"Panel\"],")
             append("[class*=\"item\"],[class*=\"Item\"]{border-radius:var(--kdkit-radius)!important;}\n")
@@ -271,9 +281,15 @@ object Md3Skin : SwitchFeature(
     private const val GLASSIFY_JS = """
   (function(){
     var DARK = document.documentElement.getAttribute('data-kdkit-dark') === '1';
-    var FILL = DARK ? 'rgba(30,33,44,.72)' : 'rgba(255,255,255,.72)';
-    var EDGE = DARK ? 'rgba(255,255,255,.14)' : 'rgba(255,255,255,.72)';
-    var SHADOW = DARK ? '0 10px 24px rgba(0,0,0,.45)' : '0 10px 24px rgba(31,36,58,.10)';
+    // 玻璃自身要带"颜色层次"：纯白半透明叠在纯白页面上等于什么都没做。
+    // 这里用「冷白 → 冷蓝 → 暖白」的斜向渐变模拟玻璃对背景的折射。
+    var FILL = DARK
+      ? 'linear-gradient(150deg, rgba(44,48,64,.82) 0%, rgba(30,36,54,.68) 52%, rgba(52,44,62,.66) 100%)'
+      : 'linear-gradient(150deg, rgba(255,255,255,.92) 0%, rgba(232,238,255,.72) 52%, rgba(255,246,232,.70) 100%)';
+    var EDGE = DARK ? 'rgba(255,255,255,.22)' : 'rgba(255,255,255,.92)';
+    var SHADOW = DARK
+      ? '0 12px 32px rgba(0,0,0,.55), inset 0 -1px 0 rgba(0,0,0,.35)'
+      : '0 12px 32px rgba(31,36,58,.14), inset 0 -1px 0 rgba(255,255,255,.35)';
     var DONE = 0;
     function rgba(cs){
       var m = /rgba?\(([0-9]+), ?([0-9]+), ?([0-9]+)(?:, ?([0-9.]+))?/.exec(cs.backgroundColor);
@@ -298,7 +314,13 @@ object Md3Skin : SwitchFeature(
         el.style.setProperty('background', FILL, 'important');
         el.style.setProperty('border', '1px solid ' + EDGE, 'important');
         el.style.setProperty('border-radius', '20px', 'important');
-        el.style.setProperty('box-shadow', 'inset 0 1px 0 ' + EDGE + ', ' + SHADOW, 'important');
+        el.style.setProperty('box-shadow',
+          'inset 0 1.5px 0 ' + EDGE + ', inset 0 -1px 0 ' +
+          (DARK ? 'rgba(255,255,255,.10)' : 'rgba(255,255,255,.45)') + ', ' + SHADOW, 'important');
+        // 液态玻璃的关键：背景模糊 + 饱和提升。只在"被我们改造成玻璃"的块上生效，
+        // 且白屏自愈（REVERT_IF_BLANK_JS）会兜底撤掉。
+        el.style.setProperty('backdrop-filter', 'blur(18px) saturate(160%) brightness(1.04)', 'important');
+        el.style.setProperty('-webkit-backdrop-filter', 'blur(18px) saturate(160%) brightness(1.04)', 'important');
         el.__kdkit_glass = 1; DONE++;
       }
     }
