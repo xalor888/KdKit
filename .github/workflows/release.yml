@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -23,23 +27,65 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # keystore 只以 base64 形式存在于 Secrets，检出后落到工作区 signing/（该目录被 .gitignore 排除）
+      - name: Restore release keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${KEYSTORE_BASE64:-}" ]; then
+            echo "::error::缺少 secret KEYSTORE_BASE64 —— 无法进行正式签名，终止发布"
+            exit 1
+          fi
+          mkdir -p signing
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > signing/kdkit-release.jks
+          chmod 600 signing/kdkit-release.jks
+          sha256sum signing/kdkit-release.jks
+          # 仓库里保存了 keystore 的 SHA-256 指纹，restore 到别的 keystore 会在这里失败
+          sha256sum -c signing/release-keystore.sha256
+
+      - name: Write signing/local.properties
+        env:
+          STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          printf 'storeFile=signing/kdkit-release.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+            "$STORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" > signing/local.properties
+          chmod 600 signing/local.properties
+
       - name: Unit tests
         working-directory: module
         run: ./gradlew --no-daemon testDebugUnitTest
 
-      - name: Build APK
+      - name: Build release APK (release signing)
         working-directory: module
-        run: ./gradlew --no-daemon assembleDebug
+        run: ./gradlew --no-daemon --stacktrace assembleRelease
+
+      - name: Verify release signature
+        run: |
+          set -euo pipefail
+          APK=module/app/build/outputs/apk/release/app-release.apk
+          test -f "$APK"
+          BT="$(ls -d "${ANDROID_HOME:-/usr/local/lib/android/sdk}"/build-tools/* | sort -V | tail -1)"
+          "$BT/apksigner" verify --print-certs "$APK" | tee /tmp/apksigner.txt
+          # 证书 DN 必须是发布证书，回退 debug 签名时这里会失败
+          grep -q 'CN=KdKit' /tmp/apksigner.txt
+          grep -q 'SHA-256 digest: 31fcbb1b32e019954b8d80f5837d64b8c15f1f78eaeba3400970c5092050cf37' /tmp/apksigner.txt
 
       - name: Name artifact after the tag
         run: |
           set -euo pipefail
-          cp module/app/build/outputs/apk/debug/app-debug.apk "KdKit-${GITHUB_REF_NAME}.apk"
+          cp module/app/build/outputs/apk/release/app-release.apk "KdKit-${GITHUB_REF_NAME}.apk"
+          sha256sum "KdKit-${GITHUB_REF_NAME}.apk" | tee "KdKit-${GITHUB_REF_NAME}.apk.sha256"
           ls -l "KdKit-${GITHUB_REF_NAME}.apk"
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          files: KdKit-*.apk
+          files: |
+            KdKit-*.apk
+            KdKit-*.apk.sha256
           generate_release_notes: true
           draft: false

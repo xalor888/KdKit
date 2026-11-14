@@ -41,3 +41,10 @@ __pycache__/
 *.hprof
 *.log
 .DS_Store
+
+# ── 发布签名（仓库是 public：keystore 与密码绝不进 git）──────────
+# signing/ 下只有非敏感说明可以入库：README.md 与 release-keystore.sha256。
+# keystore 本体、signing/local.properties（含明文密码）都留在本地。
+signing/*
+!signing/README.md
+!signing/release-keystore.sha256
