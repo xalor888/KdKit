@@ -2,7 +2,7 @@
 """
 kuaidui-kit / feature_matrix.py — how strongly is each module feature *verified*?
 
-The module has 40 features but their evidence is not equally strong: some were proven by dedicated
+The module has 41 features but their evidence is not equally strong: some were proven by dedicated
 experiments (control arms, ablations), some only show up as a counter in the capture, and some are
 merely "installed and enabled". This reads three sources and prints one honest table:
 

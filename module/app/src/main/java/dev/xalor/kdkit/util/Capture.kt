@@ -21,7 +21,7 @@ import java.util.concurrent.atomic.AtomicLong
  *  * **单写者线程 + 有界队列**：投递是内存操作，队列满就丢弃并计入 [stats]（宁可丢观测，
  *    不可拖慢宿主）；
  *  * **轮转而非删除**：写满 [maxBytes] 时把当前文件改名为 `kdkit_capture.prev.txt`，
- *    保证"刚轮转"不会被误读成"没数据"（2026-10-11 踩过，代价是一轮假红）；
+ *    保证"刚轮转"不会被误读成"没数据"（2026-10-11 遇到过，代价是一轮假红）；
  *  * **一处实现**：其它功能只调 [append] / [record]，不再自己拼时间戳与 cap；
  *  * **可诊断**：[stats] 给出 written / dropped / rotated / bytes，`module_report.py` 能读。
  */

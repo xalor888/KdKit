@@ -292,6 +292,11 @@ class ParseEveryPrefix(unittest.TestCase):
          'PROMO', 'rm_vip_promo', None, {'event': 'blocked winVIPBottom'}),
         ('16:42:16.501 MD3 window themed',
          'MD3', 'md3_skin', None, {'event': 'window themed'}),
+        ('16:42:16.600 SETTINGS entry opened from CommonCacheHybridActivity',
+         'SETTINGS', 'settings_entry', None, {'event': 'entry opened from CommonCacheHybridActivity'}),
+        ('16:42:16.601 SETTINGS launch failed ActivityNotFoundException: no Activity found',
+         'SETTINGS', 'settings_entry', None,
+         {'event': 'launch failed ActivityNotFoundException: no Activity found'}),
 ]
 
     def test_each_prefix(self):

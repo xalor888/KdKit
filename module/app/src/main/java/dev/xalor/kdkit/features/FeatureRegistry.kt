@@ -33,6 +33,7 @@ import dev.xalor.kdkit.features.host.VipPromo
 import dev.xalor.kdkit.features.host.VipUnlock
 import dev.xalor.kdkit.features.host.WatermarkOff
 import dev.xalor.kdkit.features.host.WebPictureWatermark
+import dev.xalor.kdkit.features.host.SettingsEntry
 import dev.xalor.kdkit.features.host.SkipOnboarding
 import dev.xalor.kdkit.features.host.WebRequestLog
 import dev.xalor.kdkit.features.misc.LogSink
@@ -93,6 +94,7 @@ object FeatureRegistry {
         RobustProbe,
         H5DebugConsole,
         Md3Skin,
+        SettingsEntry,
     )
 
     val categories: List<Pair<String, String>> = listOf(

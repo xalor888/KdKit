@@ -88,6 +88,8 @@ FEATURE_IDS = (
     # 2026-11-14：会员推广清理与 MD3 皮肤（v1.2）
     'rm_vip_promo',
     'md3_skin',
+    # 2026-11-14：设置页 KdKit 入口（settings_entry）
+    'settings_entry',
 )
 
 TS_RE = re.compile(r'^(\d{2}:\d{2}:\d{2}\.\d{3})\s+(.*)$', re.S)
@@ -788,6 +790,10 @@ RULES = (
     ('PROMO', 'rm_vip_promo', None, re.compile(r'^PROMO (.+)$'), _f_event),
     # `MD3 window themed` / `MD3 native bg neutralised`
     ('MD3', 'md3_skin', None, re.compile(r'^MD3 (.+)$'), _f_event),
+    # `SETTINGS entry opened ctx=CommonCacheHybridActivity` — 设置页里那一行被点中，
+    # 模块设置页已经起来。后面若被宿主拦（包可见性 / OEM），写 `SETTINGS launch failed ...`，
+    # 两种都是 `SETTINGS <一句话>`，事件名一层就够（与 PROMO / MD3 同形）。
+    ('SETTINGS', 'settings_entry', None, re.compile(r'^SETTINGS (.+)$'), _f_event),
     # ── 服务端弹窗总闸门（2026-10-25 第 21 轮 popwin_gate）─────────────────────
     # 分派点是 `ei.y.H(String type, ListItem)`，8 个类型全部来自服务端 `/kdapi/conf/popwindow`。
     # 一行三字段，缺一不可：

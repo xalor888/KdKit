@@ -11,7 +11,7 @@ import dev.xalor.kdkit.features.Category
  * 所以写的是"钩 dj.a 的 j/k/g / 7.7.2 里这个类是 aj.a / 服务端计次不受影响"。
  * 直接把它摊到列表里，用户看到的是一屏实现细节 —— 谁该开、开了会怎样，反而读不出来。
  *
- * 这里只做一件事：给**每个功能**一句人话（`label` / `blurb`）加一个**按用户意图**的分组。
+ * 这里只做一件事：给**每个功能**一句简明（`label` / `blurb`）加一个**按用户意图**的分组。
  * 技术说明原样留在 `BaseFeature.summary`，在展开区里显示，不丢。
  *
  * 纪律（`SettingsCopyTest` 会查）：
@@ -62,6 +62,7 @@ object SettingsCopy {
         Copy("skip_update", Group.EASE, "强制更新", "不再被「必须升级」挡住"),
         Copy("skip_onboarding", Group.EASE, "首次引导", "自动点掉隐私同意、年龄、身份选择"),
         Copy("exit_guard", Group.EASE, "退出守卫", "拦掉 App 的自我退出，方便调试"),
+        Copy("settings_entry", Group.EASE, "模块入口", "在快对设置页加一行，点开模块设置"),
 
         // 答题助手
         Copy("pk_assist", Group.PK, "PK 自动作答", "口算、诗词、成语、单词 PK 自动提交答案"),

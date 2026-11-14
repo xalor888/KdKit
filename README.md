@@ -22,8 +22,8 @@ LSPosed / Vector 模块，40 个可热切换的功能，Material 3 设置页（�
 
 ## 功能
 
-**40 个功能、39 个热开关**（改开关 1–2 秒生效，多数不用重启宿主）。完整清单与每项的钩点、
-证据等级见 [`module/README.md`](module/README.md)，设置页把它们分成五组：
+**41 个功能、39 个热开关**（改开关 1–2 秒生效，多数不用重启宿主）。完整清单与每项的钩点、
+证据等级见 [`module/README.md`](module/README.md)，设置页把它们分成六组：
 
 | 组 | 项数 | 内容 |
 |---|---|---|
@@ -64,6 +64,14 @@ LSPosed / Vector 模块，40 个可热切换的功能，Material 3 设置页（�
 
 模块启动时把宿主版本写进日志与抓取文件头部，版本漂移只警告、不阻止运行。
 
+## 工程规模
+
+| 项 | 数量 |
+|---|---|
+| 钩子目标 | 把 159 条钩子目标逐条对着 7.10.2 的解包树校验（159/159 解析成功） |
+| 钩子签名（`check_hook_signatures`） | 99 条逐字节比对 |
+| 工具链 | `kit/python/` 等 29 个模块；另有 132 个 python 工具 + 13 个 shell 脚本 |
+
 ## 构建
 
 ```bash
@@ -79,7 +87,7 @@ CI（[`.github/workflows`](.github/workflows)）在每次 push 跑单测 + 构�
 ```
 module/           KdKit 模块（Kotlin + Jetpack Compose + Xposed API）
   app/src/main/java/dev/xalor/kdkit/
-    features/     40 个功能，每个一个 object，钩点写在同一文件里
+    features/     41 个功能，每个一个 object，钩点写在同一文件里
     ui/           设置页（分组玻璃卡、搜索、批量开关、诊断/关于对话框）
     config/       配置通道（发布给宿主进程的 world-readable 文件）
     util/         Xp（钩子封装 + 台账）、抓取、限流…
@@ -95,12 +103,6 @@ docs/             截图
 它**不改动服务端鉴权**，会员相关功能只影响客户端显示；请在你**自己拥有或获授权**的设备上使用，
 并自行承担由此产生的一切后果。仓库不包含目标 App 的安装包（版权属原厂），
 构建产物也不含其任何代码。
-
-## 致谢
-
-- **WeKit**（微信增强模块）—— 模块骨架、`liquid` 玻璃组件与 `predictiveback` 的实现范式给了很多参照。
-- **proxyui**（本地 Compose 项目，基于 [Glasmio](https://github.com/neoruaa/glasmio) 的玻璃实现）——
-  设置页的分组玻璃卡、大标题与跟手返回的观感参照。
 
 ## License
 

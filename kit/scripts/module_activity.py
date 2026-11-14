@@ -10,7 +10,7 @@ that visible.
 This script used to read the LSPosed module log via `adb` and carry a hand-written `MARKS`
 table of 15 regexes. Both were wrong by 2026-10-25:
 
-  * the table knew 15 of 40 features and matched prefixes by substring, so `NAVACT` lines were
+  * the table knew 15 of 41 features and matched prefixes by substring, so `NAVACT` lines were
     counted as `NAV` and `RC4PT(nontext)` as `RC4PT`;
   * it required a device, so nothing could be re-verified offline.
 
@@ -28,7 +28,7 @@ Two numbers per feature, deliberately kept apart:
   * **presence** — in how many of the input files it appears (a feature that only shows up in
     one old file is not "continuously working").
 
-Features that never write a capture line (11 of 40 — ad removers, anti-detect, seccomp guard,
+Features that never write a capture line (11 of 41 — ad removers, anti-detect, seccomp guard,
 PK assist, page-JS injection) are reported in their own table with `—`, and the script says so
 explicitly instead of printing a misleading 0.
 """

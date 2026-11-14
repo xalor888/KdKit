@@ -4,7 +4,7 @@
 
 | 文档 | 说 | 实际 |
 |---|---|---|
-| `README.md:21` | 28 条钩子目标 | **46** |
+| `README.md` 工程规模表 | 28 条钩子目标 | **139**（2026-11-14：新增会员推广与皮肤后从 126 涨到 139） |
 | `kit/scripts/feature_matrix.py:5` | 18 features | **40** |
 | `kit/scripts/module_activity.py:31` | 11 of 28 | **40** |
 | `kit/scripts/module_activity.py:13` | 15 of 28 | **40** |
@@ -57,8 +57,8 @@ def registry_count():
 
 class DocNumbersMatchCode(unittest.TestCase):
 
-    def test_registry_has_40(self):
-        self.assertEqual(registry_count(), 40,
+    def test_registry_has_41(self):
+        self.assertEqual(registry_count(), 41,
                          'FeatureRegistry.all 的条目数变了 ⇒ 改所有文档里的数')
 
     def test_readme_hook_target_count(self):
@@ -67,8 +67,8 @@ class DocNumbersMatchCode(unittest.TestCase):
         m = re.search(r'把\s*(\d+)\s*条钩子目标', src)
         self.assertIsNotNone(m, 'README 里找不到"N 条钩子目标"')
         got = int(m.group(1))
-        self.assertEqual(got, 46,
-                         f'README 说 {got} 条钩子目标；常量是 46（下文 slow 测会与实跑对比）')
+        self.assertEqual(got, 159,
+                         f'README 说 {got} 条钩子目标；常量是 159（下文 slow 测会与实跑对比）')
 
     def test_feature_matrix_docstring(self):
         src = open(os.path.join(ROOT, 'kit', 'scripts', 'feature_matrix.py'),

@@ -97,7 +97,7 @@ compile-only Xposed API (API 82). Repositories fall back to the aliyun mirror be
 
 ## Feature set
 
-共 **40 个功能**（`FeatureRegistry.all` 是唯一事实源；下表由 `scripts/check_feature_parity.py` 与代码校验）。
+共 **41 个功能**（`FeatureRegistry.all` 是唯一事实源；下表由 `scripts/check_feature_parity.py` 与代码校验）。
 `热` 列 = 钩子常驻、开关在调用点判定 ⇒ **改完即时生效，不必重启快对**；空白表示冷开关（需重启宿主）。
 `选项` 列 = 该功能在设置页展开后可见的子选项（由代码里的 `KdOption` 声明，门禁校验）。
 `默认` 列就是 `BaseFeature.defaultOn`，设置页首次打开时的状态。
@@ -132,7 +132,7 @@ compile-only Xposed API (API 82). Repositories fall back to the aliyun mirror be
 | `req_headers` | 宿主请求头观测 | 宿主 | 关 | 记录请求构造时的头（名与值，值截断） | 是 | — |
 | `page_js` | 页面脚本注入（`page_js_script`） | 宿主 | 关 | 执行配置通道里的 `page_js_script` 字符串（给 `kit` 的 `call_page_js.py` 用） | 是 | `page_js_script` |
 | `web_request_log` | 页面自有请求记录 | 宿主 | 关 | 记录 WebView 自己发出的请求（不经过宿主 OkHttp 的那批） | 是 | `web_request_log_bodies` |
-| `anti_detect` | 反调试检测绕过 | 宿主 | 开 | 让宿主 `AntiDebugThread` 的 4 个判定点全部返回"干净"，Frida 可附加 | 是 | — |
+| `anti_detect` | 反调试检测绕过 | 宿主 | 开 | **反调试**：`AntiDebugThread` 的 4 个判定点（`isDebuggerConnected` / `TracerPid` / `FLAG_DEBUGGABLE` / bridge）全部返回"干净"，Frida 可附加。**环境探测面**（2026-11-14 新增，宿主里的快手 Weapon / KSAd / 百度 MobAds 都在查）：① 包名——`getInstalledPackages`/`getInstalledApplications` 里删掉 `dev.xalor.kdkit` 与常见框架包，`getPackageInfo`/`getApplicationInfo` 对它们抛 `NameNotFoundException`；② 文件——`File.exists/isFile/isDirectory` 对含 `kdkit`/`xposed`/`de.robv`/`magisk`/`/data/adb` 的路径返回 false，`list`/`listFiles` 过滤同一批条目；③ `su` 探测——`Runtime.exec`/`ProcessBuilder.start` 命中 root 探测命令时返回退出码 1 的空进程（只认 su/magisk/`which su` 白名单）；④ Xposed 类——`ClassLoader.loadClass` 解析 `de.robv.android.xposed.*` 抛 `ClassNotFoundException`（模块自身 loader 豁免）；`Class.forName` 同规则但**延后 15 秒装**（加固宿主在 `InitializationProvider` 期间会反射重入 `forName`，启动路径上直接钩必崩，见 `work/anti_detect_audit.md`）；⑤ `/proc/self/maps`——`BufferedReader.readLine` 丢掉含 `Xposed`/`frida`/`magisk` 的行（只过滤读，不动进程）。每条都有 `gate=id` 热开关与白名单，异常只降级为限流日志 | 是 | `anti_detect_vectors` |
 | `rc4_probe` | 解密观测 | 宿主 | 开 | 记录 Baidu RC4 的密钥与解密结果（解 `homeRecentList` 等加密字段） | 是 | `rc4_probe_uplink` |
 | `bridge_action_log` | 高价值桥 action 观测 | 宿主 | 关 | 结构化记录 `downloadMedia`（页面往相册写哪张图）、`getuserinfo`（谁在打听身份）、`fetchPayInfos`（页面在驱动下单：payload 长度 + 键名，不落值）、`decodeHttpRequest`（页面借宿主签名手代发请求：URL 已剥 query、params 只记键名） | 是 | `bridge_action_log_url` |
 | `parent_ctrl_write` | 家长模式写侧形状观测 | 宿主 | 关 | 钩 `dj.e.l(ParentCtrlData,int,Callback)`，记录提交快照（四个闸门 + from + userMode）；只观测不改行为 | 是 | — |
@@ -142,8 +142,9 @@ compile-only Xposed API (API 82). Repositories fall back to the aliyun mirror be
 | `vip_limit_probe` | 重练额度检查观测 | 宿主 | 关 | 记录 App 对 `examRHW` 等产品的额度判定（允许吗、已用几次）；只观测不拦截 | 是 | `vip_limit_probe_result` |
 | `rm_vip_promo` | 会员推广清理 | 宿主 | 开 | 关掉底部会员支付弹窗（`MainBottomPayDialog` 两个 public 入口 + `DialogFragment.show` 兜底）、服务端 `winVIPBottom` 分支（`hh.y.F`）与页面内的开通入口（JS 内容级过滤）；**不改会员判定** | 是 | `rm_vip_promo_h5` |
 | `vip_unlock` | 会员状态解锁（客户端） | 宿主 | 关 | 让客户端判定为会员（`bk.a.p/n`）；**服务端鉴权不受影响**，见 `NEW_TARGETS.md` §5.6 | 是 | `vip_unlock_tbx` `vip_unlock_silent` |
-| `md3_skin` | Material 3 简约皮肤 | 宿主 | 开 | H5 注入中性配色/16 圆角/去重阴影/统一字体（`WebInjector` provider 不占钩子）；原生只改窗口级颜色（`Activity.onCreate` 后设状态栏、导航栏、窗口底色） | 是 | `md3_native_window` `md3_native_bg` `md3_theme` `md3_glass` `md3_level` `md3_primary` |
+| `md3_skin` | Material 3 简约皮肤 | 宿主 | 开 | H5 注入中性配色/16 圆角/去重阴影/统一字体（`WebInjector` provider 不占钩子）；原生只改窗口级颜色（`Activity.onCreate` 后设状态栏、导航栏、窗口底色） | 是 | `md3_native_window` `md3_native_bg` `md3_h5` `md3_theme` `md3_glass` `md3_level` `md3_primary` |
 | `watermark_off` | 去水印（客户端开关） | 宿主 | 关 | 代用户打开 App 自带的「去除水印」（钩 `cu/l` 构造器置字段 `r`，`ext` 里带 `"2"`）；服务端计次/鉴权不变 | 是 | `watermark_off_writing` `watermark_off_entity` |
+| `settings_entry` | 设置页 KdKit 入口 | 宿主 | 开 | 在快对「设置」页注入一行「KdKit 模块设置」（`zyb://app-vue/page/newSetUp` 是 Vue H5 页，`WebInjector` provider 注入 DOM）；点击走 `kdkit://open-settings`，由 `com.zuoyebang.common.web.WebViewClient.shouldOverrideUrlLoading` 消费并启动模块设置页 | 否 | — |
 
 
 ### 门禁标签对照表
@@ -197,7 +198,7 @@ compile-only Xposed API (API 82). Repositories fall back to the aliyun mirror be
 
 一轮底座重构 + 热开关 + 三个新功能，详见 [`OPTIMIZATION.md`](OPTIMIZATION.md)。最该知道的三件事：
 
-1. **改开关不用再重启快对**：39/40 个功能是热开关（钩子常驻、调用点判定，1–2 秒生效）。
+1. **改开关不用再重启快对**：39/41 个功能是热开关（钩子常驻、调用点判定，1–2 秒生效）。
    唯一例外是 `native_exit_guard`（seccomp 过滤器不可撤销）。
 2. **悬空配置清零**：此前有 7 个键"代码在读、界面写不了"，现在每个键都是功能自己声明的
    `KdOption`，设置页通用渲染；门禁强制"无幽灵键、无死选项、README 与代码一致"。
@@ -284,7 +285,7 @@ python3 kit/scripts/acceptance.py --adb emulator-5558     # 其中一项就是�
 ## 每个功能"能拿什么证据说话"：`VERIFICATION.md`
 
 [`VERIFICATION.md`](VERIFICATION.md) 是**自动生成**的验证矩阵（来源：功能注册表 + 当前模块日志/抓取 + 轮次日志），
-40 个功能逐行给出：分类 / 默认 / 当前开关 / 本轮记录数 / **验证等级（强·中·弱）** / 依据 / 代表证据文件。
+41 个功能逐行给出：分类 / 默认 / 当前开关 / 本轮记录数 / **验证等级（强·中·弱）** / 依据 / 代表证据文件。
 
 等级只表示"我们现在能用什么证据说话"：`强` = 有专门轮次 + 轮次证据；`中` = 有可计数记录；
 `弱` = 只能说"已安装/已启用"。
@@ -401,7 +402,7 @@ prints nothing the install state is broken, so `adb install -r` the APK and re-r
 |---|---|---|
 | 单元测试 | **42/42** | `./gw --offline testDebugUnitTest` |
 | 编译（含 Compose 设置页） | **通过** | `./gw --offline assembleDebug` |
-| 功能表 / 子选项 schema / README 列 | **一致（40 项）** | `python3 scripts/check_feature_parity.py` |
+| 功能表 / 子选项 schema / README 列 | **一致（41 项）** | `python3 scripts/check_feature_parity.py` |
 | 钩子目标（类+方法） | **36/36** | `python3 ../kit/scripts/check_hook_targets.py` |
 | 钩子签名（形参类型） | **24/24 吻合，0 无法判定** | `python3 ../kit/scripts/check_hook_signatures.py` |
 

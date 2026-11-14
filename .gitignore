@@ -48,3 +48,6 @@ __pycache__/
 signing/*
 !signing/README.md
 !signing/release-keystore.sha256
+
+# 参考项目（miuix / HyperChanger 的源码克隆，67MB，不随仓库分发）
+reference/

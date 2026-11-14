@@ -39,6 +39,9 @@ object KdConfigBridge {
      */
     @Volatile private var repairRequest: File? = null
 
+    /** 后台刷新用的文件时间戳（只在 kdkit-prefs 线程里读写）。 */
+    @Volatile private var lastPrefsMtime = 0L
+
     /** Reader installed inside the hooked host process. */
     fun installHostReader() {
         val prefs = try {
@@ -51,17 +54,39 @@ object KdConfigBridge {
             null
         } ?: return
 
+        // 2026-11-14 ANR 修复：以前每次读配置都在**调用方线程**上 `reload()`，
+        // 而调用方通常是主线程（Activity.onCreate / View.setBackground 等钩子）——
+        // `XSharedPreferences.reload()` 会 startLoadFromDisk 并拿锁，主线程因此卡死
+        // （真机现场：`/data/anr/traces.txt` 主线程停在 XSharedPreferences.startLoadFromDisk）。
+        //
+        // 现在：读配置只读内存，磁盘刷新交给一个后台线程按 mtime 变化节流执行。
+        // 首次加载在后台线程里做，最坏情况下前几百毫秒拿到的是"未加载"（返回 null ⇒ 用功能默认值）。
+        val file = prefs.file
+        val worker = android.os.HandlerThread("kdkit-prefs").apply { start() }
+        val handler = android.os.Handler(worker.looper)
+        val refresh = object : Runnable {
+            override fun run() {
+                try {
+                    val mtime = file?.lastModified() ?: 0L
+                    if (mtime != lastPrefsMtime) {
+                        lastPrefsMtime = mtime
+                        prefs.reload()
+                    }
+                } catch (t: Throwable) {
+                    XposedBridge.log("[KdKit] prefs refresh failed: $t")
+                }
+                handler.postDelayed(this, 500)
+            }
+        }
+        handler.post(refresh)
+
         KdConfig.hostReader = { id ->
             try {
-                prefs.reload()
                 if (prefs.contains(id)) prefs.getBoolean(id, true) else null
             } catch (t: Throwable) { null }
         }
         KdConfig.hostStringReader = { id ->
-            try {
-                prefs.reload()
-                prefs.getString(id, null)
-            } catch (t: Throwable) { null }
+            try { prefs.getString(id, null) } catch (t: Throwable) { null }
         }
     }
 

@@ -32,7 +32,7 @@ import dev.xalor.kdkit.util.Xp
  *  * `md3_theme`：`auto`（跟系统）/ `light` / `dark`。
  *
  * 深色下**不再动原生背景**：把原生大色块换成深色后，位图与文字仍是深色，对比度会直接坏掉
- * （2026-11-14 真机截图踩到）。深色只走"窗口配色"，原生部分保持 App 自己的样子。
+ * （2026-11-14 真机截图遇到过）。深色只走"窗口配色"，原生部分保持 App 自己的样子。
  */
 object Md3Skin : SwitchFeature(
     id = "md3_skin",
@@ -59,9 +59,9 @@ object Md3Skin : SwitchFeature(
         KdOption(
             key = "md3_native_bg",
             title = "同时中性化原生大色块背景",
-            summary = "浅色下把面积大、颜色高饱和的背景换成中性 surface；深色下不生效（会破坏对比度）",
+            summary = "默认关：它会为每个 View 排一次主线程任务，页面复杂时会拖慢甚至 ANR（2026-11-14 实测）",
             kind = KdOption.Kind.BOOLEAN,
-            default = "true",
+            default = "false",
         ),
         KdOption(
             key = "md3_theme",
@@ -71,18 +71,25 @@ object Md3Skin : SwitchFeature(
             default = "auto",
         ),
         KdOption(
+            key = "md3_h5",
+            title = "对网页本身套皮肤",
+            summary = "默认关。开了才会注入页面样式；部分页面（拍题答疑 / 口算 PK）注入后会白屏，关掉即恢复",
+            kind = KdOption.Kind.BOOLEAN,
+            default = "false",
+        ),
+        KdOption(
             key = "md3_glass",
             title = "液态玻璃",
             summary = "H5 卡片半透明 + 背景模糊 + 高光描边；不支持 blur 的 WebView 会退化成半透明",
             kind = KdOption.Kind.BOOLEAN,
-            default = "true",
+            default = "false",
         ),
         KdOption(
             key = "md3_level",
             title = "强度",
-            summary = "full=连大色块与渐变一起归一；light=只改圆角阴影（保守）",
+            summary = "full=连大色块与渐变一起归一；light=只改圆角阴影（保守，默认）",
             kind = KdOption.Kind.STRING,
-            default = "full",
+            default = "light",
         ),
         KdOption(
             key = "md3_primary",
@@ -93,12 +100,17 @@ object Md3Skin : SwitchFeature(
         ),
     )
 
+    /** 原生背景中性化的主线程任务预算（每次进程启动重置）。 */
+    private var bgTasks = 0
+
     override fun install() {
         val g = id
         var n = 0
 
         WebInjector.register("md3_skin") {
-            if (!KdConfig.isOn("md3_skin", defaultOn)) "" else script()
+            if (!KdConfig.isOn("md3_skin", defaultOn)) ""
+            else if (!KdConfig.isOn("md3_h5", false)) ""    // 默认不碰页面：注入是白屏的唯一来源
+            else script()
         }
 
         if (Xp.hook("android.app.Activity", "onCreate", Bundle::class.java, gate = g, onAfter = { p ->
@@ -126,6 +138,9 @@ object Md3Skin : SwitchFeature(
                 if (isDark()) return@hook
                 val v = p.thisObject as? View ?: return@hook
                 val d = p.args.getOrNull(0) as? Drawable ?: return@hook
+                if (v.getTag(0x6b646274) != null) return@hook      // 每个 View 只排队一次
+                v.setTag(0x6b646274, true)
+                if (bgTasks++ > 200) return@hook                     // 单进程上限，避免 ANR
                 v.post {
                     runCatching {
                         if (v.width <= 0 || v.height <= 0) return@post
@@ -239,9 +254,40 @@ object Md3Skin : SwitchFeature(
             append(if (full) "full" else "light").append("');\n")
             if (dark) append(DARK_INVERT_CSS)
             if (full && !dark) append(NORMALISE_JS)
+            append(REVERT_IF_BLANK_JS)
             append("})();\n")
         }
     }
+
+    /**
+     * 白屏自愈：注入后 1.2s / 3s 各查一次，若页面被我们弄空了（没有可见文字、也没有图片/画布），
+     * 就把注入的 style 与标记全部撤掉 —— **宁可没有皮肤，也不能给用户一片白**。
+     *
+     * 2026-11-14 用户实测：拍题答疑、口算 PK 等页面在注入后会白屏。
+     * 根因是页面自身是"容器里再渲染"的结构，外层的背景/模糊规则会让内层不可见。
+     * 这类问题无法靠静态门禁发现，只能靠"注入者自己会退场"。
+     */
+    private const val REVERT_IF_BLANK_JS = """
+  function kdkitBlank(){
+    var txt = (document.body && document.body.innerText || '').replace(/\s+/g, '');
+    var media = document.querySelectorAll('img,canvas,video,iframe,svg').length;
+    var nodes = document.querySelectorAll('*').length;
+    return txt.length < 20 && media === 0 && nodes < 200;
+  }
+  function kdkitRevert(){
+    try {
+      var st = document.getElementById('__kdkit_md3'); if (st) st.remove();
+      document.documentElement.removeAttribute('data-kdkit-md3');
+      document.documentElement.removeAttribute('data-kdkit-dark');
+      document.documentElement.removeAttribute('data-kdkit-invert');
+      document.documentElement.style.removeProperty('filter');
+      if (document.body) { document.body.style.removeProperty('background'); document.body.style.removeProperty('color'); }
+      window.__kdkit_md3_reverted = 1;
+    } catch (e) {}
+  }
+  setTimeout(function(){ if (kdkitBlank()) kdkitRevert(); }, 1200);
+  setTimeout(function(){ if (kdkitBlank()) kdkitRevert(); }, 3000);
+"""
 
     /**
      * 深色适配 —— **整页反色 + 媒体再反色**（Dark Reader 的简化版）。
@@ -291,6 +337,10 @@ object Md3Skin : SwitchFeature(
       var cs = getComputedStyle(el);
       var c = rgbaOf(cs);
       var grad = /gradient|url\(/.test(cs.backgroundImage);
+      // 2026-11-14 保护：含较多文本的层是**内容**不是背景，动它就会让页面看起来变空。
+      var txt = (el.innerText || '').trim();
+      if (txt.length > 60) continue;
+      if (el.id === 'app' || el === document.body || el === document.documentElement) continue;
       if (!DARK) {
         var sat = 0, mx = 0;
         if (c) { mx = Math.max(c[0],c[1],c[2]); var mn = Math.min(c[0],c[1],c[2]);

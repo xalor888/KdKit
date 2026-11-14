@@ -85,7 +85,7 @@ object PageRequestOrigin {
      * URL 只留 host + path。
      *
      * 与 `DecodeRequestShape.redactUrl` **同一口径**，这里直接复用：
-     * 两处各写一遍是漂移的来源（本项目已经因为"同一规则两处实现"踩过坑）。
+     * 两处各写一遍是漂移的来源（本项目已经因为"同一规则两处实现"遇到过坑）。
      */
     fun redactUrl(raw: String, maxPath: Int = 80): String = DecodeRequestShape.redactUrl(raw, maxPath)
 

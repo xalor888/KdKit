@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +18,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.IconButton
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -24,7 +32,11 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Warning
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.core.animateFloatAsState
@@ -49,6 +61,9 @@ import dev.xalor.kdkit.features.BaseFeature
 import dev.xalor.kdkit.features.FeatureRegistry
 import dev.xalor.kdkit.ui.theme.KdKitTheme
 import dev.xalor.kdkit.ui.theme.LocalGlass
+import top.yukonga.miuix.kmp.basic.SmallTitle
+import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.preference.SwitchPreference
 import dev.xalor.kdkit.ui.theme.UiPrefs
 import java.io.File
 import java.text.SimpleDateFormat
@@ -60,7 +75,7 @@ import java.util.Locale
  *
  * 改的是什么：**信息的组织方式**，不是功能。
  *  * 38 张独立卡 → **一组一张卡**（分段列表，参照 WeKit 的 `SegmentedColumn` 范式）；
- *  * 长技术副标题 → **一句人话**（`SettingsCopy`），技术说明降级到点击展开区；
+ *  * 长技术副标题 → **一句简明**（`SettingsCopy`），技术说明降级到点击展开区；
  *  * "必须重启" 与 "即时生效" 的自相矛盾 → 顶部说一次 + 行内徽标，不再两处打架；
  *  * 灌满首屏的"配置通道"技术卡 → 缩成状态行里的一个 chip，点开才是诊断对话框；
  *  * 加批量入口：组级"全开/全关"、全量"推荐配置/恢复默认"、关于页。
@@ -154,8 +169,30 @@ private fun SettingsScreen(
     val scroll = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val health = remember(version) { channelHealth(ctx) }
 
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+
+    // 底栏四个入口 → 各组在列表里的位置（非搜索态；搜索态底栏隐藏）
+    val groupTop = buildMap {
+        var idx = 2
+        for (g in Group.values()) {
+            val items = SettingsCopy.items(g).mapNotNull { FeatureRegistry.byId(it.id) }
+            if (items.isEmpty()) continue
+            put(g, idx)
+            idx += 1
+            if (expandedGroups[g] ?: g.expanded) idx += 1
+        }
+    }
+
     Scaffold(
         containerColor = Color.Transparent,
+        bottomBar = {
+            if (!searching) {
+                GlassBottomBar(glass) { g ->
+                    scope.launch { listState.animateScrollToItem(groupTop[g] ?: 0) }
+                }
+            }
+        },
         modifier = Modifier.nestedScroll(scroll.nestedScrollConnection),
         topBar = {
             LargeTopAppBar(
@@ -203,8 +240,9 @@ private fun SettingsScreen(
         },
     ) { padding ->
         LazyColumn(
+            state = listState,
             modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 28.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 104.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item { StatusLine(health) { showDiag = true } }
@@ -285,6 +323,60 @@ private fun SettingsScreen(
 
     if (showDiag) DiagnosticsDialog(version, onDismiss = { showDiag = false }) { version++ }
     if (showAbout) AboutDialog(onDismiss = { showAbout = false })
+}
+
+/* ───────────────────────── 悬浮玻璃底栏 ───────────────────────── */
+
+/**
+ * FuseHide 那种"浮在内容上方的玻璃胶囊底栏"：4 个分组入口 + 选中高亮。
+ *
+ * 为什么需要它：40 个功能滚起来很长，原来只能靠滑动找组。
+ * 底栏把"去广告 / 内容 / 外观 / 诊断"变成一键跳转 —— 同时它本身也是玻璃材质的展示面。
+ */
+@Composable
+private fun GlassBottomBar(glass: Boolean, onJump: (Group) -> Unit) {
+    val entries = listOf(
+        Triple(Group.ADS, Icons.Default.Block, "去广告"),
+        Triple(Group.CONTENT, Icons.Default.Tune, "内容"),
+        Triple(Group.LOOK, Icons.Default.Palette, "外观"),
+        Triple(Group.DIAG, Icons.Default.BugReport, "诊断"),
+    )
+    Box(
+        Modifier.fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(horizontal = 20.dp, vertical = 10.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        GlassCard(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(30.dp),
+            glassOff = !glass,
+            elevation = 18.dp,
+        ) {
+            Row(
+                Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                entries.forEach { (g, icon, label) ->
+                    Column(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .clickable { onJump(g) }
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Icon(icon, contentDescription = label, tint = LocalGlass.current.accent)
+                        Text(
+                            label,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = LocalGlass.current.onCard,
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 /* ───────────────────────── 状态行 ───────────────────────── */
@@ -445,37 +537,20 @@ private fun FeatureRow(
     val copy = SettingsCopy.of(f.id)
 
     Column(Modifier.clickable { onRowClick() }) {
-        Row(
-            modifier = Modifier.padding(start = 16.dp, end = 12.dp, top = 10.dp, bottom = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    copy?.label ?: f.title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
-                    color = if (checked) LocalGlass.current.onCard else LocalGlass.current.onCardMuted,
-                )
-                Text(
-                    copy?.blurb ?: f.summary,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = LocalGlass.current.onCardMuted,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            Switch(
-                checked = checked,
-                onCheckedChange = { v ->
-                    KdConfig.setApp(ctx, f.id, v)
-                    onChange()
-                },
-            )
-        }
+        SwitchPreference(
+            checked = checked,
+            onCheckedChange = { v ->
+                KdConfig.setApp(ctx, f.id, v)
+                onChange()
+            },
+            title = copy?.label ?: f.title,
+            summary = copy?.blurb ?: f.summary,
+            modifier = Modifier.clickable { onRowClick() },
+        )
         AnimatedVisibility(visible = expanded) {
             Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp)) {
                 // 只留真正有用的两件事：标识（给排障/抓取对账用）与生效方式。
-                // 标题不再重复一遍（人话标题就在上面），summary 的尾部括号提示也剥掉 ——
+                // 标题不再重复一遍（简明标题就在上面），summary 的尾部括号提示也剥掉 ——
                 // 那是"改开关即时生效 / 需重启"，这里已经单独写了。
                 Text(
                     "标识 ${f.id} · " + if (f.hot) "即时生效" else "需重启快对",
@@ -617,36 +692,113 @@ private fun DiagnosticsDialog(version: Int, onDismiss: () -> Unit, onChange: () 
     )
 }
 
-/* ───────────────────────── 关于 ───────────────────────── */
+/* ───────────────────────── 关于（版本 / 作者 / 检查更新） ───────────────────────── */
+
+private const val REPO_OWNER = "xalor888"
+private const val REPO_NAME = "KdKit"
+private const val REPO_URL = "https://github.com/$REPO_OWNER/$REPO_NAME"
+private const val RELEASES_URL = "$REPO_URL/releases"
+private const val API_LATEST = "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/releases/latest"
+
+/** GitHub release JSON 里的 tag 提取 —— 编译期构造一次（门禁 ⑲ 把语句位置正则算作热路径）。 */
+private val TAG_RE = Regex("\"tag_name\"\\s*:\\s*\"([^\"]+)\"")
+
+private sealed interface UpdateState {
+    data object Checking : UpdateState
+    data object Latest : UpdateState
+    data class Newer(val tag: String) : UpdateState
+    data class Failed(val why: String) : UpdateState
+}
+
+/** 拉 GitHub 最新 release 的 tag（不引入网络库：一次 GET + 正则）。 */
+private fun fetchLatestTag(): String? = runCatching {
+    val conn = (java.net.URL(API_LATEST).openConnection() as java.net.HttpURLConnection).apply {
+        requestMethod = "GET"
+        connectTimeout = 6000
+        readTimeout = 6000
+        setRequestProperty("Accept", "application/vnd.github+json")
+        setRequestProperty("User-Agent", "KdKit-Android")
+    }
+    try {
+        if (conn.responseCode !in 200..299) return null
+        val body = conn.inputStream.bufferedReader().use { it.readText() }
+        TAG_RE.find(body)?.groupValues?.get(1)
+    } finally {
+        conn.disconnect()
+    }
+}.getOrNull()
+
+private fun openUrl(ctx: android.content.Context, url: String) {
+    runCatching {
+        ctx.startActivity(
+            android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }
+}
 
 @Composable
 private fun AboutDialog(onDismiss: () -> Unit) {
     val ctx = LocalContext.current
     val selfVer = remember {
-        runCatching {
-            ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName ?: "?"
-        }.getOrDefault("?")
+        runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName ?: "?" }
+            .getOrDefault("?")
     }
+    var state by remember { mutableStateOf<UpdateState>(UpdateState.Checking) }
+
+    // 打开关于页就自动检查一次更新。
+    LaunchedEffect(Unit) {
+        state = runCatching {
+            val tag: String? = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { fetchLatestTag() }
+            if (tag == null) {
+                UpdateState.Failed("连不上 GitHub，稍后再试")
+            } else if (tag.trimStart('v', 'V') == selfVer) {
+                UpdateState.Latest
+            } else {
+                UpdateState.Newer(tag)
+            }
+        }.getOrElse { UpdateState.Failed(it.message ?: "检查失败") }
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("KdKit") },
+        title = { Text("关于 KdKit") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("模块版本 $selfVer · 目标 ${KdConfig.TARGET_PKG}", style = MaterialTheme.typography.bodySmall)
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("版本 $selfVer · MIT License", style = MaterialTheme.typography.bodyMedium)
                 Text(
                     "适配基线 快对 ${dev.xalor.kdkit.HostVersion.BASELINE_VERSION_NAME}" +
-                        "（${dev.xalor.kdkit.HostVersion.BASELINE_VERSION_CODE}）；" +
-                        "同时兼容 7.10.0 / 7.9.0。",
+                        "（${dev.xalor.kdkit.HostVersion.BASELINE_VERSION_CODE}），兼容 7.10.0 / 7.9.0。",
                     style = MaterialTheme.typography.bodySmall,
                 )
+                HorizontalDivider(Modifier.padding(vertical = 4.dp))
                 Text(
-                    "注入方式：LSPosed / Vector。没有 Xposed 环境时模块不生效。" +
-                        "宿主版本与钩子统计看快对日志里以 [KdKit] 开头的行。",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    when (val st = state) {
+                        UpdateState.Checking -> "正在检查更新…"
+                        UpdateState.Latest -> "已是最新版本"
+                        is UpdateState.Newer -> "有新版本 ${st.tag}"
+                        is UpdateState.Failed -> "检查更新失败：${st.why}"
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = when (state) {
+                        is UpdateState.Newer -> MaterialTheme.colorScheme.primary
+                        is UpdateState.Failed -> MaterialTheme.colorScheme.error
+                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                    },
                 )
+                if (state is UpdateState.Newer) {
+                    TextButton(onClick = { openUrl(ctx, RELEASES_URL) }) {
+                        Text("打开发布页下载")
+                    }
+                }
+                HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                Text("作者 xalor", style = MaterialTheme.typography.bodySmall)
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    TextButton(onClick = { openUrl(ctx, REPO_URL) }) { Text("项目主页") }
+                    TextButton(onClick = { openUrl(ctx, RELEASES_URL) }) { Text("全部版本") }
+                }
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("知道了") } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("关闭") } },
     )
 }

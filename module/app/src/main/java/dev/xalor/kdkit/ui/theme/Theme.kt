@@ -12,6 +12,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.theme.darkColorScheme as miuixDarkScheme
+import top.yukonga.miuix.kmp.theme.lightColorScheme as miuixLightScheme
 
 /**
  * 玻璃色板 —— "液态玻璃"这套视觉需要的颜色全在这里算一次。
@@ -34,6 +37,12 @@ data class GlassColors(
     val onCard: Color,
     val onCardMuted: Color,
     val accent: Color,
+    // 玻璃卡内部的两团彩色晕染与三段高光边（"液态"的来源）
+    val cardTint1: Color,
+    val cardTint2: Color,
+    val cardHighlightTop: Color,
+    val cardHighlightMid: Color,
+    val cardHighlightBottom: Color,
 )
 
 private val LightGlass = GlassColors(
@@ -49,6 +58,11 @@ private val LightGlass = GlassColors(
     onCard = Color(0xFF1B1B22),
     onCardMuted = Color(0xFF5A5A68),
     accent = Color(0xFF4C5BC4),
+    cardTint1 = Color(0x66A8B6FF),
+    cardTint2 = Color(0x66FFD7A1),
+    cardHighlightTop = Color(0xEEFFFFFF),
+    cardHighlightMid = Color(0x33FFFFFF),
+    cardHighlightBottom = Color(0x14FFFFFF),
 )
 
 private val DarkGlass = GlassColors(
@@ -64,6 +78,11 @@ private val DarkGlass = GlassColors(
     onCard = Color(0xFFECEBF4),
     onCardMuted = Color(0xFF9A9AAC),
     accent = Color(0xFF9AA6FF),
+    cardTint1 = Color(0x55808CFF),
+    cardTint2 = Color(0x55C9A2FF),
+    cardHighlightTop = Color(0x59FFFFFF),
+    cardHighlightMid = Color(0x1FFFFFFF),
+    cardHighlightBottom = Color(0x0AFFFFFF),
 )
 
 val LocalGlass = staticCompositionLocalOf { LightGlass }
@@ -112,8 +131,13 @@ fun KdKitTheme(
 
     val glassColors = if (dark) DarkGlass else LightGlass
 
-    CompositionLocalProvider(LocalGlass provides glassColors) {
-        MaterialTheme(colorScheme = scheme, content = content)
+    // Miuix 的色板与文字样式：设置页的行（SuperSwitch / SmallTitle）从它取色。
+    val miuixColors = if (dark) miuixDarkScheme() else miuixLightScheme()
+
+    MiuixTheme(colors = miuixColors) {
+        CompositionLocalProvider(LocalGlass provides glassColors) {
+            MaterialTheme(colorScheme = scheme, content = content)
+        }
     }
 }
 

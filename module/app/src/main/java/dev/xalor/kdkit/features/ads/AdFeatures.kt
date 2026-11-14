@@ -203,9 +203,9 @@ object RemovePopupAd : SwitchFeature(
  * 去 smali 里 `aj.a` 找广告位、结果找到会员类 —— 2026-11-02 改正。
  *
  * 实现上刻意把"调用"记在 **before**：实测当另一个钩子在 before 里 `setResult` 短路后，
- * 同一方法上后续钩子的 **after 回调不再执行** —— 只靠 after 记日志的观测钩子会整个哑掉（踩过）。
+ * 同一方法上后续钩子的 **after 回调不再执行** —— 只靠 after 记日志的观测钩子会整个哑掉（遇到过）。
  *
- * 另外它回答了一个此前的疑问：本机 App 自己的广告位读取**本来就返回 null**（`/init/ad/config` 是空表），
+ * 另外它回答了一个此前的疑问：测试设备上 App 自己的广告位读取**本来就返回 null**（`/init/ad/config` 是空表），
  * 所以"看不到广告"里有一段与模块无关。
  */
 object AdSlotProbe : SwitchFeature(

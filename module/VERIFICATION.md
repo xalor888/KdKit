@@ -7,7 +7,7 @@
 | feature | 标题 | 分类 | 默认 | 当前 | 记录数 | 静态钩子 | 验证等级 | 真机 | 依据 | 代表证据 |
 |---|---|---|---|---|---|---|---|---|---|---|
 | `ad_probe` | 广告位读取观测 | ADS | false | ? | 34 | 5/5 | **强** | 未验证 | R37 以它为主题 + 证据文件 | `module/README.md` |
-| `anti_detect` | 反调试检测绕过 | HOST | true | ? | 0 | 4/4 | **强** | 未验证 | R12 以它为主题 + 证据文件 | `module/README.md`<br>`work/dpsdk/FINDINGS.md` |
+| `anti_detect` | 反调试检测绕过 | HOST | true | ? | 0 | 22/22 | **强** | 未验证 | R12 以它为主题 + 证据文件 | `module/README.md`<br>`work/dpsdk/FINDINGS.md` |
 | `block_ad_sdk` | 广告 SDK 阻断 | ADS | false | ? | 0 | 4/4 | **强** | 未验证 | R31 以它为主题 + 证据文件 | `work/TRIAGE.md`<br>`work/dpsdk/ad_ablation_r31.txt`<br>`work/dpsdk/ad_baseline_on.txt` |
 | `bridge_guard` | 桥守卫（页面侧敏感 action） | HOST | false | ? | 14 | 2/2 | **强** | 未验证 | R20 以它为主题 + 证据文件 | `module/README.md`<br>`work/dpsdk/bridge_guard_r20.txt` |
 | `exit_guard` | 退出守卫 | HOST | true | ? | 0 | 5/5 | **强** | 未验证 | R12 以它为主题 + 证据文件 | `module/README.md`<br>`work/dpsdk/FINDINGS.md` |
@@ -27,24 +27,25 @@
 | `sign_observer` | 签名 / 密钥观测 | MISC | false | ? | 10268 | 8/8 | **强** | 未验证 | R7 以它为主题 + 证据文件 | `work/dpsdk/token_offline_r6.txt` |
 | `skip_onboarding` | 跳过首次启动引导 | HOST | false | ? | 0 | 2/2 | **强** | 未验证 | R11 以它为主题 + 证据文件 | `module/README.md`<br>`work/dpsdk/R11_skip_on.png` |
 | `web_request_log` | 页面自有请求记录 | HOST | false | ? | 0 | 共享:WebInjector | **强** | 未验证 | R119 以它为主题 + 证据文件 | `work/TRIAGE.md` |
-| `bridge_action_log` | 高价值桥 action 观测 | HOST | false | ? | 0 | 4/4 | **中** | 未验证 | 前缀已声明、本批样本 0 条（样本可能早于该功能，见 ACTIVITY.md §四） | `kit/python/tests/fixtures/all_prefixes.txt`<br>`module/MIGRATION-7102.md`<br>`module/UI.md` |
-| `http_body_probe` | HTTP 请求/响应体观测 | HOST | false | ? | 0 | 5/5 | **中** | 未验证 | 前缀已声明、本批样本 0 条（样本可能早于该功能，见 ACTIVITY.md §四） | `kit/python/tests/fixtures/all_prefixes.txt`<br>`module/MIGRATION-7102.md`<br>`module/UI.md` |
-| `log_sink` | App 日志收录 | MISC | true | ? | 3568 | 6/6 | **中** | 未验证 | 可计数记录（本轮 3568 条） | `kit/python/tests/fixtures/all_prefixes.txt`<br>`module/MIGRATION-7102.md`<br>`module/UI.md` |
-| `md3_skin` | Material 3 简约皮肤 | HOST | true | ? | 0 | 2/2 | **中** | 未验证 | 前缀已声明、本批样本 0 条（样本可能早于该功能，见 ACTIVITY.md §四） | `kit/python/tests/fixtures/all_prefixes.txt`<br>`module/MIGRATION-7102.md`<br>`module/UI.md` |
-| `nav_log` | 页面导航观测 | HOST | true | ? | 21 | 3/3 | **中** | 未验证 | 可计数记录（本轮 21 条） | `kit/python/tests/fixtures/all_prefixes.txt`<br>`module/MIGRATION-7102.md`<br>`module/UI.md` |
-| `net_error_probe` | 网络失败原因观测 | HOST | false | ? | 0 | 1/1 | **中** | 未验证 | 前缀已声明、本批样本 0 条（样本可能早于该功能，见 ACTIVITY.md §四） | `kit/python/tests/fixtures/all_prefixes.txt`<br>`module/MIGRATION-7102.md`<br>`module/UI.md` |
-| `page_request_log` | 页面代发请求来源观测 | HOST | false | ? | 0 | 1/1 | **中** | 未验证 | 前缀已声明、本批样本 0 条（样本可能早于该功能，见 ACTIVITY.md §四） | `kit/python/tests/fixtures/all_prefixes.txt`<br>`module/MIGRATION-7102.md`<br>`module/UI.md` |
-| `parent_ctrl_probe` | 家长模式闸门观测 | HOST | false | ? | 0 | 1/1 | **中** | 未验证 | 前缀已声明、本批样本 0 条（样本可能早于该功能，见 ACTIVITY.md §四） | `kit/python/tests/fixtures/all_prefixes.txt`<br>`module/MIGRATION-7102.md`<br>`module/UI.md` |
-| `parent_ctrl_write` | 家长模式提交观测 | HOST | false | ? | 0 | 1/1 | **中** | 未验证 | 前缀已声明、本批样本 0 条（样本可能早于该功能，见 ACTIVITY.md §四） | `kit/python/tests/fixtures/all_prefixes.txt`<br>`module/MIGRATION-7102.md`<br>`module/UI.md` |
-| `popwin_gate` | 服务端弹窗总闸门 | HOST | false | ? | 0 | 1/1 | **中** | 未验证 | 前缀已声明、本批样本 0 条（样本可能早于该功能，见 ACTIVITY.md §四） | `kit/python/tests/fixtures/all_prefixes.txt`<br>`module/MIGRATION-7102.md`<br>`module/UI.md` |
-| `rc4_probe` | 解密观测 | HOST | true | ? | 1271 | 4/4 | **中** | 未验证 | 可计数记录（本轮 1271 条） | `kit/python/tests/fixtures/all_prefixes.txt`<br>`module/MIGRATION-7102.md`<br>`module/UI.md` |
-| `rm_vip_promo` | 会员推广清理 | HOST | true | ? | 0 | 6/6 | **中** | 未验证 | 前缀已声明、本批样本 0 条（样本可能早于该功能，见 ACTIVITY.md §四） | `kit/python/tests/fixtures/all_prefixes.txt`<br>`module/MIGRATION-7102.md`<br>`module/UI.md` |
-| `robust_probe` | 热修复补丁面观测 | HOST | false | ? | 0 | 1/1 | **中** | 未验证 | 前缀已声明、本批样本 0 条（样本可能早于该功能，见 ACTIVITY.md §四） | `kit/python/tests/fixtures/all_prefixes.txt`<br>`module/MIGRATION-7102.md`<br>`module/UI.md` |
-| `route_log` | 路由观测 | HOST | true | ? | 0 | 3/3 | **中** | 未验证 | 前缀已声明、本批样本 0 条（样本可能早于该功能，见 ACTIVITY.md §四） | `kit/python/tests/fixtures/all_prefixes.txt`<br>`module/MIGRATION-7102.md`<br>`module/UI.md` |
-| `skip_update` | 跳过强制更新 | HOST | false | ? | 0 | 2/2 | **中** | 未验证 | 前缀已声明、本批样本 0 条（样本可能早于该功能，见 ACTIVITY.md §四） | `kit/python/tests/fixtures/all_prefixes.txt`<br>`module/MIGRATION-7102.md`<br>`module/UI.md` |
-| `vip_limit_probe` | 重练额度检查观测 | HOST | false | ? | 0 | 1/1 | **中** | 未验证 | 前缀已声明、本批样本 0 条（样本可能早于该功能，见 ACTIVITY.md §四） | `kit/python/tests/fixtures/all_prefixes.txt`<br>`module/MIGRATION-7102.md`<br>`module/UI.md` |
-| `vip_unlock` | 会员状态解锁（客户端） | HOST | false | ? | 0 | 3/3 | **中** | 未验证 | 前缀已声明、本批样本 0 条（样本可能早于该功能，见 ACTIVITY.md §四） | `kit/python/tests/fixtures/all_prefixes.txt`<br>`module/MIGRATION-7102.md`<br>`module/UI.md` |
-| `watermark_off` | 去水印（客户端开关） | HOST | false | ? | 0 | 2/2 | **中** | 未验证 | 前缀已声明、本批样本 0 条（样本可能早于该功能，见 ACTIVITY.md §四） | `kit/python/tests/fixtures/all_prefixes.txt`<br>`module/MIGRATION-7102.md`<br>`module/UI.md` |
+| `bridge_action_log` | 高价值桥 action 观测 | HOST | false | ? | 0 | 4/4 | **中** | 未验证 | 前缀已声明、本批样本 0 条（样本可能早于该功能，见 ACTIVITY.md §四） | `kit/python/tests/fixtures/all_prefixes.txt`<br>`module/UI.md`<br>`work/dpsdk/FINDINGS.md` |
+| `http_body_probe` | HTTP 请求/响应体观测 | HOST | false | ? | 0 | 5/5 | **中** | 未验证 | 前缀已声明、本批样本 0 条（样本可能早于该功能，见 ACTIVITY.md §四） | `kit/python/tests/fixtures/all_prefixes.txt`<br>`module/UI.md`<br>`work/dpsdk/FINDINGS.md` |
+| `log_sink` | App 日志收录 | MISC | true | ? | 3568 | 6/6 | **中** | 未验证 | 可计数记录（本轮 3568 条） | `kit/python/tests/fixtures/all_prefixes.txt`<br>`module/UI.md`<br>`work/dpsdk/FINDINGS.md` |
+| `md3_skin` | Material 3 简约皮肤 | HOST | true | ? | 0 | 2/2 | **中** | 未验证 | 前缀已声明、本批样本 0 条（样本可能早于该功能，见 ACTIVITY.md §四） | `kit/python/tests/fixtures/all_prefixes.txt`<br>`module/UI.md`<br>`work/dpsdk/FINDINGS.md` |
+| `nav_log` | 页面导航观测 | HOST | true | ? | 21 | 3/3 | **中** | 未验证 | 可计数记录（本轮 21 条） | `kit/python/tests/fixtures/all_prefixes.txt`<br>`module/UI.md`<br>`work/dpsdk/FINDINGS.md` |
+| `net_error_probe` | 网络失败原因观测 | HOST | false | ? | 0 | 1/1 | **中** | 未验证 | 前缀已声明、本批样本 0 条（样本可能早于该功能，见 ACTIVITY.md §四） | `kit/python/tests/fixtures/all_prefixes.txt`<br>`module/UI.md`<br>`work/dpsdk/FINDINGS.md` |
+| `page_request_log` | 页面代发请求来源观测 | HOST | false | ? | 0 | 1/1 | **中** | 未验证 | 前缀已声明、本批样本 0 条（样本可能早于该功能，见 ACTIVITY.md §四） | `kit/python/tests/fixtures/all_prefixes.txt`<br>`module/UI.md`<br>`work/dpsdk/FINDINGS.md` |
+| `parent_ctrl_probe` | 家长模式闸门观测 | HOST | false | ? | 0 | 1/1 | **中** | 未验证 | 前缀已声明、本批样本 0 条（样本可能早于该功能，见 ACTIVITY.md §四） | `kit/python/tests/fixtures/all_prefixes.txt`<br>`module/UI.md`<br>`work/dpsdk/FINDINGS.md` |
+| `parent_ctrl_write` | 家长模式提交观测 | HOST | false | ? | 0 | 1/1 | **中** | 未验证 | 前缀已声明、本批样本 0 条（样本可能早于该功能，见 ACTIVITY.md §四） | `kit/python/tests/fixtures/all_prefixes.txt`<br>`module/UI.md`<br>`work/dpsdk/FINDINGS.md` |
+| `popwin_gate` | 服务端弹窗总闸门 | HOST | false | ? | 0 | 1/1 | **中** | 未验证 | 前缀已声明、本批样本 0 条（样本可能早于该功能，见 ACTIVITY.md §四） | `kit/python/tests/fixtures/all_prefixes.txt`<br>`module/UI.md`<br>`work/dpsdk/FINDINGS.md` |
+| `rc4_probe` | 解密观测 | HOST | true | ? | 1271 | 4/4 | **中** | 未验证 | 可计数记录（本轮 1271 条） | `kit/python/tests/fixtures/all_prefixes.txt`<br>`module/UI.md`<br>`work/dpsdk/FINDINGS.md` |
+| `rm_vip_promo` | 会员推广清理 | HOST | true | ? | 0 | 6/6 | **中** | 未验证 | 前缀已声明、本批样本 0 条（样本可能早于该功能，见 ACTIVITY.md §四） | `kit/python/tests/fixtures/all_prefixes.txt`<br>`module/UI.md`<br>`work/dpsdk/FINDINGS.md` |
+| `robust_probe` | 热修复补丁面观测 | HOST | false | ? | 0 | 1/1 | **中** | 未验证 | 前缀已声明、本批样本 0 条（样本可能早于该功能，见 ACTIVITY.md §四） | `kit/python/tests/fixtures/all_prefixes.txt`<br>`module/UI.md`<br>`work/dpsdk/FINDINGS.md` |
+| `route_log` | 路由观测 | HOST | true | ? | 0 | 3/3 | **中** | 未验证 | 前缀已声明、本批样本 0 条（样本可能早于该功能，见 ACTIVITY.md §四） | `kit/python/tests/fixtures/all_prefixes.txt`<br>`module/UI.md`<br>`work/dpsdk/FINDINGS.md` |
+| `settings_entry` | 设置页 KdKit 入口 | HOST | true | ? | 0 | 2/2 | **中** | 未验证 | 前缀已声明、本批样本 0 条（样本可能早于该功能，见 ACTIVITY.md §四） | `kit/python/tests/fixtures/all_prefixes.txt`<br>`module/UI.md`<br>`work/dpsdk/FINDINGS.md` |
+| `skip_update` | 跳过强制更新 | HOST | false | ? | 0 | 2/2 | **中** | 未验证 | 前缀已声明、本批样本 0 条（样本可能早于该功能，见 ACTIVITY.md §四） | `kit/python/tests/fixtures/all_prefixes.txt`<br>`module/UI.md`<br>`work/dpsdk/FINDINGS.md` |
+| `vip_limit_probe` | 重练额度检查观测 | HOST | false | ? | 0 | 1/1 | **中** | 未验证 | 前缀已声明、本批样本 0 条（样本可能早于该功能，见 ACTIVITY.md §四） | `kit/python/tests/fixtures/all_prefixes.txt`<br>`module/UI.md`<br>`work/dpsdk/FINDINGS.md` |
+| `vip_unlock` | 会员状态解锁（客户端） | HOST | false | ? | 0 | 3/3 | **中** | 未验证 | 前缀已声明、本批样本 0 条（样本可能早于该功能，见 ACTIVITY.md §四） | `kit/python/tests/fixtures/all_prefixes.txt`<br>`module/UI.md`<br>`work/dpsdk/FINDINGS.md` |
+| `watermark_off` | 去水印（客户端开关） | HOST | false | ? | 0 | 2/2 | **中** | 未验证 | 前缀已声明、本批样本 0 条（样本可能早于该功能，见 ACTIVITY.md §四） | `kit/python/tests/fixtures/all_prefixes.txt`<br>`module/UI.md`<br>`work/dpsdk/FINDINGS.md` |
 | `web_picture_watermark` | 大图浏览页水印（本地绘制） | HOST | false | ? | 0 | 2/2 | **弱** | 未验证 | 钩子目标 2/2 在 APK 中解析成功（含形参签名），但尚无真机/实验证据 | - |
 
 **`真机` 列**：`未验证` = 本轮**没有**设备跑过这个功能。门禁能证明的是"钩得住、编译过、纯逻辑对"，不能证明"设备上行为真的变了"。

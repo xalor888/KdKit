@@ -398,6 +398,8 @@ def main(argv):
     applogs = [r for r in of('APPSIGN')]
     promos = [r for r in of('PROMO')]
     md3s = [r for r in of('MD3')]
+    # 设置页里那一行「KdKit 模块设置」被点中 ⇒ 模块设置页起来了（`settings_entry`）。
+    settings = [r for r in of('SETTINGS')]
     marks = [r for r in of('WATERMARK')]
     # `EXITSTACK #n <栈>` 是**另一个前缀**、另一个 feature-visible 事实：它记的是
     # "从哪条调用链退出的"。早先这里只取 `EXITCALL`，于是栈信息**整类被丢掉** ——
@@ -478,6 +480,9 @@ def main(argv):
     if md3s:
         events = sorted({str(r.get('event')) for r in md3s})
         w(f'* `md3_skin`：外观覆盖生效 {len(md3s)} 次（{", ".join(events[:4])}）\n')
+    if settings:
+        events = sorted({str(r.get('event')) for r in settings})
+        w(f'* `settings_entry`：设置页入口命中 {len(settings)} 次（{", ".join(events[:4])}）\n')
     if onboard:
         w(f'* `skip_onboarding`：点过 {len(onboard)} 次，'
           f'成功 {sum(1 for r in onboard if r.get("ok"))} 次\n')

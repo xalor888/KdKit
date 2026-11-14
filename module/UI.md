@@ -29,7 +29,7 @@ WeKit 的设置页不是"很多卡片"，而是：
 |---|---|---|---|---|
 | `ads` | 去广告 | 7 | 展开 | 开屏、横幅、页签、弹窗、信息流，一次关干净 |
 | `content` | 内容与会员 | 4 | 展开 | 会员标识、水印、服务端弹窗 |
-| `ease` | 省心开关 | 3 | 展开 | 强制更新、首次引导、退出守卫 |
+| `ease` | 省心开关 | 4 | 展开 | 强制更新、首次引导、退出守卫、设置页入口 |
 | `pk` | 答题助手 | 1 | 展开 | 口算 / 诗词 / 成语 / 单词 PK 自动作答 |
 | `diag` | 诊断与抓取 | 23 | **收起** | 观测数据写文件，排障时才开 |
 
@@ -191,3 +191,33 @@ RRO 资源覆盖，风险是崩溃面 —— 本模块只做**看感四件套**�
 * 设置模块：三件默认开；顶栏两个按钮（主题 / 玻璃）即时切换，不重启。
 * 宿主：`md3_skin` 的玻璃与浅色归一默认开；深色跟随系统但**只影响窗口配色**；
   `md3_theme` 可强制 light/dark。
+
+## 13. 稳定化与 Miuix 化（v1.4）
+
+一轮真机反馈引发的返工：**界面再好看，白屏和 ANR 都是致命的**。这一版先修稳定性，再换视觉。
+
+### 13.1 三个真问题（都有现场证据）
+
+| 问题 | 根因 | 修法 |
+|---|---|---|
+| **拍题答疑 / 口算 PK 白屏** | `md3_skin` 的 H5 注入（背景覆盖 + `backdrop-filter`）在"容器内再渲染"的页面上会让内层不可见 | ① H5 注入默认**关**（`md3_h5`），只有主动开启才注入；② 注入后 1.2s / 3s 各做一次**白屏自愈**：检测不到文字与图片就把自己的 style 与标记全部撤掉（`REVERT_IF_BLANK_JS`） |
+| **快对 ANR（"快对AI isn't responding"）** | `KdConfigBridge` 的配置读取在**调用方线程**上 `XSharedPreferences.reload()`，而调用方常是主线程（Activity.onCreate / View 背景钩子）—— 主线程停在 `startLoadFromDisk` | 读配置只读内存；磁盘刷新挪到后台 `HandlerThread("kdkit-prefs")`，按文件 mtime 变化节流（500ms） |
+| **原生背景中性化拖慢页面** | 每个 `View.setBackground` 都 `post` 一个主线程任务 | 默认关（`md3_native_bg`）+ 每个 View 只排队一次 + 单进程 200 次预算 |
+
+`kit/scripts/smoke_pages.py` 把这三件事变成可一键回归的命令：启动 → 首页 / 拍题答疑 / AI 写作 / 我的 / 设置页，逐页数文本节点，低于阈值判红；遇到系统弹窗（崩溃 / 权限）自动点掉再判。
+
+### 13.2 视觉：Miuix + 液态玻璃 + 悬浮底栏
+
+- 组件库：`miuix-ui:0.9.3` + `miuix-preference:0.9.3`（新代拆分模块，`SwitchPreference` / `ArrowPreference` /
+  `SmallTitle` / `TopAppBar` / `Scaffold` / `NavigationBar`）。代价是整栈上抬：Kotlin **2.3.21**、
+  compileSdk **37**、Compose 走 **CMP 1.11.1**（不再用 androidx BOM，避免两套 runtime）。
+  AGP 8.13 对 compileSdk 37 只告警，已在 `gradle.properties` 显式压掉。
+- 行：`SwitchPreference`（HyperOS 开关与行排版），不再画分隔线。
+- 材质：`GlassCard` 三层 —— 彩色晕染底层 → `BlurEffect(26px)` 模糊 → 上亮下暗的高光边；背景加细噪点，否则"糊与不糊"看不出差别（上一版被评价"和没有区别"的直接原因）。
+- 底栏：`GlassBottomBar`，浮在内容上方的玻璃胶囊，四个入口（去广告 / 内容 / 外观 / 诊断）一键滚到对应分组。
+
+### 13.3 取舍
+
+- 0.9.4 仍被 AGP 9.1 门槛挡住（`checkDebugAarMetadata` 实测），因此停在 **0.9.3**（PoC 里 0.9.3 + Kotlin 2.3.21 +
+  CMP 1.11.1 + compileSdk 37 实测 `BUILD SUCCESSFUL`）。
+- `miuix-blur` / `miuix-glass` 未在 Maven 发布（或 minSdk 33），所以玻璃仍是自绘 —— 但这次是**真模糊**（`RenderEffect`），不是纯半透明。

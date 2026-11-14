@@ -6,7 +6,7 @@
 
 ## 判据（这一节是"怎么读"，不是结论）
 
-* **有抓取行的功能 29 个**：数它们自己写的前缀行数 —— 这是"确实执行过"的硬证据；
+* **有抓取行的功能 30 个**：数它们自己写的前缀行数 —— 这是"确实执行过"的硬证据；
 * **只写 logcat 的功能 11 个**：结构上不写抓取，本表给 `—`，不代表没工作；
 * **出现份数**：在多少份输入里出现过。只在 1 份里出现 = 那一轮跑过，不能推断"一直在跑"；
 * 计数为 0 的**不等于失效** —— 默认关的功能没触发、或该轮没走到那条业务路径，都是 0。要区分"没开"与"钩子失效"，看 `module_report.py` 的 audit 行。
@@ -39,6 +39,7 @@
 | `rm_vip_promo` | 0 | 0/1 | — | — |
 | `robust_probe` | 0 | 0/1 | — | — |
 | `route_log` | 0 | 0/1 | — | — |
+| `settings_entry` | 0 | 0/1 | — | — |
 | `skip_onboarding` | 0 | 0/1 | — | — |
 | `vip_limit_probe` | 0 | 0/1 | — | — |
 | `vip_unlock` | 0 | 0/1 | — | — |
@@ -79,6 +80,7 @@
 | `rm_vip_promo` | 默认关 / 本轮没走到 / 钩子失效 —— 三者不可由本表区分，要看 `module_report.py` 的 `HookCore ready` 与 `hooks N ok / M failed` |
 | `robust_probe` | 默认关 / 本轮没走到 / 钩子失效 —— 三者不可由本表区分，要看 `module_report.py` 的 `HookCore ready` 与 `hooks N ok / M failed` |
 | `route_log` | 默认关 / 本轮没走到 / 钩子失效 —— 三者不可由本表区分，要看 `module_report.py` 的 `HookCore ready` 与 `hooks N ok / M failed` |
+| `settings_entry` | 默认关 / 本轮没走到 / 钩子失效 —— 三者不可由本表区分，要看 `module_report.py` 的 `HookCore ready` 与 `hooks N ok / M failed` |
 | `skip_onboarding` | 默认关 / 本轮没走到 / 钩子失效 —— 三者不可由本表区分，要看 `module_report.py` 的 `HookCore ready` 与 `hooks N ok / M failed` |
 | `vip_limit_probe` | 默认关 / 本轮没走到 / 钩子失效 —— 三者不可由本表区分，要看 `module_report.py` 的 `HookCore ready` 与 `hooks N ok / M failed` |
 | `vip_unlock` | 默认关 / 本轮没走到 / 钩子失效 —— 三者不可由本表区分，要看 `module_report.py` 的 `HookCore ready` 与 `hooks N ok / M failed` |
@@ -114,6 +116,7 @@
 | `RC4UP` | `rc4_probe` | `RC4Probe.encrypt` 钩子 | **未验证** |
 | `ROBUST` | `robust_probe` | 见功能源码 | **未验证** |
 | `ROUTE` | `route_log` | `RouteLog` 钩子 | **未验证** |
+| `SETTINGS` | `settings_entry` | 见功能源码 | **未验证** |
 | `VIP` | `vip_unlock` | `module/NEW_TARGETS.md` §3（`bk.a.p` / `VipCurrentStatusWebAction`） | **未验证** |
 | `VIPLIMIT` | `vip_limit_probe` | 见功能源码 | **未验证** |
 | `WATERMARK` | `watermark_off` | `WatermarkOff`（`cu/l` 构造器，`NEW_TARGETS.md` §2.2） | **未验证** |
@@ -171,6 +174,7 @@
 
 | 功能 (id) | 前缀 / 形态 | 落盘 | 限流 |
 |---|---|---|---|
+| `settings_entry` | `SETTINGS entry opened` | cap | 每次打开 1 条 |
 | `rm_adconfig` | `blocked ad slot read:` | log+cap | 前 20 条 |
 | `ad_probe` | `ADSLOT call` / `ADSLOT ret` | cap | 每 key 12 条 |
 | `log_sink` | `APPSIGN <级别>/<tag>:`；**2026-10-25 前采集的样本里 99.7% 是模块自身日志的重复行**（`SELF_TAG` 排除是之后才加，见 `OPTIMIZATION.md` §22） | cap | 每 tag 2000 |

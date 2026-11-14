@@ -69,7 +69,7 @@ object HttpBodyProbe : SwitchFeature(
     hot = true,
 ) {
     // 下面的类名全部写**字面量**（不用 const），因为 ④⑤⑥ 按字面量解析；
-    // 集中成常量会让这三道门看不到目标 —— `RouteLog` 踩过，见 PARADIGM §7.6.1。
+    // 集中成常量会让这三道门看不到目标 —— `RouteLog` 遇到过，见 PARADIGM §7.6.1。
 
     /** 单行上限。body 可能很长（作文、列表），落盘必须限长 —— PARADIGM §7.5。 */
     private const val MAX = 600
@@ -123,7 +123,7 @@ object HttpBodyProbe : SwitchFeature(
      * 而不是"构造参数按想象拼起来应该是什么"。
      *
      * 两个类名/方法名都写**字面量**，不传变量：④⑤⑥ 三道门按字面量解析，
-     * 传 `cls` 会让这条钩子对门禁**不可见**（`RouteLog` 里踩过同一个坑，
+     * 传 `cls` 会让这条钩子对门禁**不可见**（`RouteLog` 里遇到过同一个坑，
      * `PARADIGM.md §7.6.1` 已写成规则）。
      */
     private fun hookRequestBody(): Int {

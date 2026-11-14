@@ -89,3 +89,4 @@ REQBODY json len=88 {"a":1}
 16:42:16.213 PCTRLW unavailable reason=no_write_permission
 16:42:16.500 PROMO blocked winVIPBottom
 16:42:16.501 MD3 window themed
+16:42:16.500 SETTINGS entry opened from CommonCacheHybridActivity

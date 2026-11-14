@@ -153,8 +153,9 @@ def one_line(rec) -> str:
     if kind == 'ROUTE':
         return f'- `{ts}` **ROUTE** `{f.get("route")}` arg=`{f.get("arg")}` from=`{f.get("from")}`'
 
-    # 2026-11-14：会员推广清理 / MD3 皮肤 —— 只有事件名一层（见 capture_schema._f_event）
-    if kind in ('PROMO', 'MD3'):
+    # 2026-11-14：会员推广清理 / MD3 皮肤 / 设置页入口 —— 只有事件名一层
+    # （见 capture_schema._f_event）
+    if kind in ('PROMO', 'MD3', 'SETTINGS'):
         return f'- `{ts}` **{kind}** `{f.get("event")}`'
 
     if kind == 'NAV':

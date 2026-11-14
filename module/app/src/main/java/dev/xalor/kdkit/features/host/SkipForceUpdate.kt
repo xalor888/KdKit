@@ -85,7 +85,7 @@ object SkipForceUpdate : SwitchFeature(
         KdLog.i("SkipForceUpdate installed ($n hooks)")
     }
 
-    /** 诊断用：本机是不是"强制更新"版本（读偏好，不写）。 */
+    /** 诊断用：当前是否"强制更新"版本（读偏好，不写）。 */
     fun forceUpdateFlag(): String = try {
         val cls = Xp.clazzOrNull("com.kuaiduizuoye.scan.preference.CommonPreference")
         if (cls == null) "unavailable" else {

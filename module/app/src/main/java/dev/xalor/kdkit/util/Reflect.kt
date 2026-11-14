@@ -8,7 +8,7 @@ package dev.xalor.kdkit.util
  * 这类代码最容易写错，而写错的后果是**静默返回默认值**，不是崩溃 ——
  * 抓取里那一列会一直显示 `-`，没有任何报错提示。
  *
- * 具体踩过的坑（2026-10-25，`ReqHeaders.pidOf` 第一版）：
+ * 具体遇到过的坑（2026-10-25，`ReqHeaders.pidOf` 第一版）：
  *
  * ```kotlin
  * val f = req?.javaClass?.getField("mInputBase")
