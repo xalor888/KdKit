@@ -1,0 +1,4 @@
+#!/bin/sh
+G=$(find "$HOME/.gradle/wrapper/dists/gradle-8.14.5-bin" -maxdepth 6 -path '*/bin/gradle' -type f 2>/dev/null | head -1)
+[ -n "$G" ] || { echo "gradle dist not found"; exit 1; }
+exec "$G" "$@"

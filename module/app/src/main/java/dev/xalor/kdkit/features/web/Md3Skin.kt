@@ -1,0 +1,327 @@
+package dev.xalor.kdkit.features.web
+
+import android.app.Activity
+import android.content.Context
+import android.content.res.Configuration
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.Drawable
+import android.os.Bundle
+import android.view.View
+import androidx.core.view.WindowCompat
+import dev.xalor.kdkit.config.KdConfig
+import dev.xalor.kdkit.config.KdOption
+import dev.xalor.kdkit.features.Category
+import dev.xalor.kdkit.features.SwitchFeature
+import dev.xalor.kdkit.util.Capture
+import dev.xalor.kdkit.util.KdLog
+import dev.xalor.kdkit.util.Xp
+
+/**
+ * Material 3 简约皮肤（H5 层 + 原生窗口层），含深色适配与液态玻璃。
+ *
+ * ### 为什么是"注入"而不是"重绘"
+ *
+ * 快对的界面是**原生壳 + H5 页面**（`hybrid/<module>/<page>-<hash>-hycache.html`）。
+ * 原生侧重做要逐控件改（或做 RRO 资源覆盖），任何一处都是崩溃面；H5 侧只需要一段
+ * JavaScript —— 覆盖的是**颜色、圆角、阴影、字体、透明度**这几类"看感"，不动布局与交互。
+ *
+ * ### 三档强度 + 深色
+ *
+ *  * `md3_level`：`full`（默认，连大色块一起归一）/ `light`（只改圆角阴影）；
+ *  * `md3_theme`：`auto`（跟系统）/ `light` / `dark`。
+ *
+ * 深色下**不再动原生背景**：把原生大色块换成深色后，位图与文字仍是深色，对比度会直接坏掉
+ * （2026-11-14 真机截图踩到）。深色只走"窗口配色"，原生部分保持 App 自己的样子。
+ */
+object Md3Skin : SwitchFeature(
+    id = "md3_skin",
+    title = "Material 3 简约皮肤",
+    summary = "H5 注入中性配色/圆角/去阴影/液态玻璃，支持深色；原生侧只改窗口级颜色",
+    category = Category.HOST,
+    defaultOn = true,
+    hot = true,
+) {
+    private const val SURFACE_LIGHT = 0xFFF6F4F9.toInt()
+    private const val SURFACE_DARK = 0xFF10121A.toInt()
+
+    /** 颜色格式校验只编译一次 —— 门禁 ⑲ 把"语句位置构造正则"算作热路径重复计算。 */
+    private val HEX_COLOR = Regex("^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
+
+    override val options: List<KdOption> = listOf(
+        KdOption(
+            key = "md3_native_window",
+            title = "同时统一原生状态栏 / 窗口背景",
+            summary = "hook 宿主 Activity 的 onCreate，把状态栏与窗口底色设成同一中性色；关掉则只皮肤化 H5",
+            kind = KdOption.Kind.BOOLEAN,
+            default = "true",
+        ),
+        KdOption(
+            key = "md3_native_bg",
+            title = "同时中性化原生大色块背景",
+            summary = "浅色下把面积大、颜色高饱和的背景换成中性 surface；深色下不生效（会破坏对比度）",
+            kind = KdOption.Kind.BOOLEAN,
+            default = "true",
+        ),
+        KdOption(
+            key = "md3_theme",
+            title = "深色适配",
+            summary = "auto=跟系统深色；light／dark 强制。深色下页面与窗口一起换色板",
+            kind = KdOption.Kind.STRING,
+            default = "auto",
+        ),
+        KdOption(
+            key = "md3_glass",
+            title = "液态玻璃",
+            summary = "H5 卡片半透明 + 背景模糊 + 高光描边；不支持 blur 的 WebView 会退化成半透明",
+            kind = KdOption.Kind.BOOLEAN,
+            default = "true",
+        ),
+        KdOption(
+            key = "md3_level",
+            title = "强度",
+            summary = "full=连大色块与渐变一起归一；light=只改圆角阴影（保守）",
+            kind = KdOption.Kind.STRING,
+            default = "full",
+        ),
+        KdOption(
+            key = "md3_primary",
+            title = "主色（十六进制）",
+            summary = "留空用默认靛蓝 #5B6BC0；填入如 #7C4DFF 会替换页面按钮主色",
+            kind = KdOption.Kind.STRING,
+            default = "",
+        ),
+    )
+
+    override fun install() {
+        val g = id
+        var n = 0
+
+        WebInjector.register("md3_skin") {
+            if (!KdConfig.isOn("md3_skin", defaultOn)) "" else script()
+        }
+
+        if (Xp.hook("android.app.Activity", "onCreate", Bundle::class.java, gate = g, onAfter = { p ->
+                if (!KdConfig.isOn("md3_native_window", true)) return@hook
+                val act = p.thisObject as? Activity ?: return@hook
+                if (act.packageName != KdConfig.TARGET_PKG) return@hook
+                runCatching {
+                    val w = act.window ?: return@hook
+                    val sf = surface()
+                    val dark = isDark()
+                    w.statusBarColor = sf
+                    w.navigationBarColor = sf
+                    val c = WindowCompat.getInsetsController(w, w.decorView)
+                    c.isAppearanceLightStatusBars = !dark
+                    c.isAppearanceLightNavigationBars = !dark
+                    n++
+                    Capture.mark("MD3 window themed" + if (dark) " (dark)" else "")
+                }
+            })
+        ) n++
+
+        // 原生大色块：只在浅色下生效（见类注释）。面积阈值把按钮/角标挡在外面。
+        if (Xp.hook("android.view.View", "setBackground", Drawable::class.java, gate = g, onAfter = { p ->
+                if (!KdConfig.isOn("md3_native_bg", true)) return@hook
+                if (isDark()) return@hook
+                val v = p.thisObject as? View ?: return@hook
+                val d = p.args.getOrNull(0) as? Drawable ?: return@hook
+                v.post {
+                    runCatching {
+                        if (v.width <= 0 || v.height <= 0) return@post
+                        if (v.width * v.height < 120_000) return@post
+                        val c = sampleColor(d) ?: return@post
+                        val r = Color.red(c); val gg = Color.green(c); val b = Color.blue(c)
+                        val mx = maxOf(r, gg, b); val mn = minOf(r, gg, b)
+                        val sat = if (mx == 0) 0f else (mx - mn).toFloat() / mx
+                        if (sat > 0.45f && mx > 170 && v !is android.widget.Button) {
+                            v.setBackgroundColor(surface())
+                            Capture.mark("MD3 native bg neutralised")
+                        }
+                    }
+                }
+            })
+        ) n++
+
+        KdLog.i("Md3Skin installed ($n hooks + h5 provider)")
+    }
+
+    /**
+     * 从 Drawable 里取一个代表色 —— 只认三种常见形态，其余返回 null（不动）。
+     * 为什么这么保守：取不到颜色就替换，会把图片背景（照片、插画）一起弄坏。
+     */
+    private fun sampleColor(d: Drawable): Int? = runCatching {
+        when (d) {
+            is ColorDrawable -> d.color
+            is android.graphics.drawable.BitmapDrawable -> {
+                val bmp = d.bitmap ?: return null
+                if (bmp.width < 8 || bmp.height < 8) return null
+                bmp.getPixel(bmp.width / 2, bmp.height / 2)
+            }
+            is android.graphics.drawable.GradientDrawable -> {
+                val m = d.javaClass.getMethod("getColors")
+                (m.invoke(d) as? IntArray)?.firstOrNull()
+            }
+            else -> null
+        }
+    }.getOrNull()
+
+    /** 深色判定：`md3_theme` 显式指定优先；`auto` 读系统 `uiMode`。 */
+    private fun isDark(): Boolean = when (KdConfig.getString("md3_theme", "auto").trim().lowercase()) {
+        "dark" -> true
+        "light" -> false
+        else -> runCatching {
+            // `ActivityThread` 是隐藏 API，编译期不可见 —— 反射取（同 HostVersion 的做法）。
+            val ctx = Class.forName("android.app.ActivityThread")
+                .getMethod("currentApplication").invoke(null) as? Context
+            val night = (ctx?.resources?.configuration?.uiMode
+                ?: Configuration.UI_MODE_NIGHT_NO) and Configuration.UI_MODE_NIGHT_MASK
+            night == Configuration.UI_MODE_NIGHT_YES
+        }.getOrDefault(false)
+    }
+
+    private fun surface(): Int = if (isDark()) SURFACE_DARK else SURFACE_LIGHT
+
+    private fun primary(): String {
+        val raw = KdConfig.getString("md3_primary", "").trim()
+        return if (HEX_COLOR.matches(raw)) raw else "#5B6BC0"
+    }
+
+    private fun script(): String {
+        val dark = isDark()
+        val full = KdConfig.getString("md3_level", "full").trim().lowercase() != "light"
+        val glass = KdConfig.isOn("md3_glass", true)
+        val surface = if (dark) "#10121A" else "#F6F4F9"
+        val onSurface = if (dark) "#ECEBF4" else "#1C1B1F"
+        val onMuted = if (dark) "#9A9AAC" else "#5A5A68"
+        val glassFill = if (dark) "rgba(28,31,42,.60)" else "rgba(255,255,255,.62)"
+        val glassBorder = if (dark) "rgba(255,255,255,.10)" else "rgba(255,255,255,.55)"
+        val glassShadow = if (dark) "0 8px 24px rgba(0,0,0,.38)" else "0 8px 24px rgba(31,36,58,.10)"
+
+        KdLog.i("Md3Skin inject dark=$dark glass=$glass level=${if (full) "full" else "light"}")
+
+        // 深色下**不动 H5 页面**：快对的页面自身没有深色主题，模块侧只能靠反色/逐块改色去凑，
+        // 而这两条路在真机上都验证失败过（白卡白字 / 背景色不跟 —— 见 work/ui_md3_dark_home*.png）。
+        // 与其交付一个"看起来深了但读不清"的皮肤，不如只做原生窗口：状态栏、导航栏、窗口底色。
+        if (dark) return ""
+
+        return buildString {
+            append("(function(){\n")
+            append("  if (window.__kdkit_md3) { try { window.__kdkit_md3.remove(); } catch(e){} }\n")
+            append("  document.documentElement.setAttribute('data-kdkit-dark','")
+            append(if (dark) "1" else "0").append("');\n")
+            append("  var st = document.createElement('style'); st.id = '__kdkit_md3';\n")
+            append("  st.textContent = `\n")
+            append("    :root{--kdkit-surface:").append(surface)
+            append(";--kdkit-surface-2:").append(if (dark) "#171A24" else "#FFFFFF")
+            append(";--kdkit-on-surface:").append(onSurface)
+            append(";--kdkit-on-muted:").append(onMuted)
+            append(";--kdkit-primary:").append(primary()).append(";--kdkit-radius:16px;}\n")
+            append("    html,body,#app,#__nuxt,#root,body>div,[class*=\"page\"],[class*=\"Page\"],")
+            append("[class*=\"root\"],[class*=\"Root\"]{background:var(--kdkit-surface)!important;")
+            append("color:var(--kdkit-on-surface)!important;}\n")
+            append("    body{font-family:\"Noto Sans SC\",\"HarmonyOS Sans SC\",system-ui,-apple-system,sans-serif!important;}\n")
+            append("    [class*=\"card\"],[class*=\"Card\"],[class*=\"panel\"],[class*=\"Panel\"],")
+            append("[class*=\"item\"],[class*=\"Item\"]{border-radius:var(--kdkit-radius)!important;}\n")
+            append("    button,[role=\"button\"],[class*=\"btn\"],[class*=\"Button\"]{")
+            append("border-radius:20px!important;box-shadow:none!important;}\n")
+            append("    hr,[class*=\"divider\"],[class*=\"Divider\"]{opacity:.6!important;}\n")
+            if (glass) {
+                append("    [class*=\"card\"],[class*=\"Card\"],[class*=\"panel\"],[class*=\"Panel\"],")
+                append("[class*=\"item\"],[class*=\"Item\"]{background:").append(glassFill).append("!important;")
+                append("backdrop-filter:blur(16px) saturate(1.25)!important;")
+                append("-webkit-backdrop-filter:blur(16px) saturate(1.25)!important;")
+                append("border:1px solid ").append(glassBorder).append("!important;")
+                append("box-shadow:").append(glassShadow).append("!important;}\n")
+            }
+            append("  `;\n  document.head.appendChild(st);\n")
+            append("  document.documentElement.setAttribute('data-kdkit-md3','")
+            append(if (full) "full" else "light").append("');\n")
+            if (dark) append(DARK_INVERT_CSS)
+            if (full && !dark) append(NORMALISE_JS)
+            append("})();\n")
+        }
+    }
+
+    /**
+     * 深色适配 —— **整页反色 + 媒体再反色**（Dark Reader 的简化版）。
+     *
+     * 为什么不用"逐块把亮底改深 + 近黑文字改亮"（2026-11-14 试过两轮，两次都坏）：
+     * 页面里白底可能来自**父层**、来自 `background-image`、也可能来自伪元素 ——
+     * 逐块检测只能改到"自己带 backgroundColor 的那一层"，漏掉一层就会出现
+     * **白卡 + 白字**（实测截图 `work/ui_md3_dark_home5.png`：文字读不出来）。
+     *
+     * 反色的代价是可控的：`img/video/canvas/svg` 再反一次就还原，彩色经
+     * `hue-rotate(180deg)` 修正后基本保持原色调。整体效果与 Dark Reader 同类。
+     */
+    private const val DARK_INVERT_CSS = """
+  st.textContent += `
+    html { filter: invert(1) hue-rotate(180deg) !important; }
+    html, body { background: #10121A !important; }
+    img, video, canvas, svg, picture, [class*="avatar"], [class*="Avatar"],
+    [class*="icon"], [class*="Icon"], [class*="thumb"], [class*="Thumb"] {
+      filter: invert(1) hue-rotate(180deg) !important;
+    }
+  `;
+  document.documentElement.setAttribute('data-kdkit-invert','1');
+"""
+
+    /**
+     * 页面级"配色归一"（双模），按**面积阈值 + 取样色**判断，按钮/图标/角标在阈值以下：
+     *  * 浅色：大块**高饱和**背景 → 中性 surface（去品牌大色块）；
+     *  * 深色：大块**高亮**背景压深 + 近黑文字提亮（否则白底黑字在深色系统里会更刺眼）。
+     */
+    private const val NORMALISE_JS = """
+  var DARK = document.documentElement.getAttribute('data-kdkit-dark') === '1';
+  var DONE = 0, DONE_T = 0;
+  function rgbaOf(cs){
+    var m = /rgba?\(([0-9]+), ?([0-9]+), ?([0-9]+)(?:, ?([0-9.]+))?/.exec(cs.backgroundColor);
+    if (!m) return null;
+    return [+m[1], +m[2], +m[3], m[4] === undefined ? 1 : +m[4]];
+  }
+  function norm(){
+    var els = document.querySelectorAll('div, section, header, main, #app, body > div');
+    for (var i = 0; i < els.length && DONE < 400; i++) {
+      var el = els[i];
+      if (el.__kdkit_md3_n) continue;
+      if (el.getAttribute && el.getAttribute('data-kdkit-md3-skip') === '1') continue;
+      var r = el.getBoundingClientRect();
+      var area = r.width * r.height;
+      if (area < (DARK ? 40000 : 120000)) continue;
+      var cs = getComputedStyle(el);
+      var c = rgbaOf(cs);
+      var grad = /gradient|url\(/.test(cs.backgroundImage);
+      if (!DARK) {
+        var sat = 0, mx = 0;
+        if (c) { mx = Math.max(c[0],c[1],c[2]); var mn = Math.min(c[0],c[1],c[2]);
+                 sat = mx === 0 ? 0 : (mx - mn) / mx; }
+        if (grad || (sat > 0.45 && mx > 170)) {
+          el.style.setProperty('background', 'var(--kdkit-surface)', 'important');
+          el.style.setProperty('background-image', 'none', 'important');
+          el.__kdkit_md3_n = 1; DONE++;
+        }
+      } else if (c) {
+        var lum = (c[0] * 299 + c[1] * 587 + c[2] * 114) / 1000;
+        if (lum > 200) {
+          var big = area > 300000;
+          el.style.setProperty('background', big ? 'var(--kdkit-surface)' : 'rgba(26,29,39,.92)', 'important');
+          el.style.setProperty('backdrop-filter', 'blur(16px) saturate(1.2)', 'important');
+          el.__kdkit_md3_n = 1; DONE++;
+        }
+      }
+    }
+    if (DARK) {
+      var texts = document.querySelectorAll('div, span, p, b, strong');
+      for (var j = 0; j < texts.length && DONE_T < 400; j++) {
+        var e = texts[j];
+        if (e.__kdkit_md3_t || !e.firstChild || e.firstChild.nodeType !== 3) continue;
+        var col = rgbaOf(getComputedStyle(e));
+        if (!col) continue;
+        var L = (col[0] * 299 + col[1] * 587 + col[2] * 114) / 1000;
+        if (L < 90) { e.style.setProperty('color', 'var(--kdkit-on-surface)', 'important'); e.__kdkit_md3_t = 1; DONE_T++; }
+      }
+    }
+  }
+  norm(); setTimeout(norm, 700); setTimeout(norm, 1800); setTimeout(norm, 3200);
+"""
+}

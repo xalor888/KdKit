@@ -1,0 +1,91 @@
+16:42:15.500 === KdKit host=7.7.2/1811 sdk=36 baseline=true
+16:42:15.543 RC4KEY b(1811): b2674b28abdc8df3f5e0d8915559bf1b6a53e95bdd3e393d097d1a33ed4a4e48899b3f8b8a291b9028d4151a84d51b9031cd22941af1d9898bc5ba70303e7562
+16:42:15.544 RC4KEY refreshed: b2674b28abdc8df3f5e0d8915559bf1b6a53e95bdd3e393d097d1a33ed4a4e48899b3f8b8a291b9028d4151a84d51b9031cd22941af1d9898bc5ba70303e7562
+16:42:15.545 RC4KEYSTR 0123456789abcdef0123456789abcdef | len=32
+16:42:15.546 RC4KEY deadbeefdeadbeefdeadbeefdeadbeef | len=16
+16:42:15.603 SIGN params: _t_=1791708135 | appId=scancode | vc=1811 | cuid=00000000000000000000000000000000|0
+16:42:15.603 SIGN URL: https://pluto.zuoyebang.com/pluto/app/hotfix?&codeMD5=2677d8f8060c2215efdce550c9cf79b7&vc=1811&sign=1eb767338f942454c6b7c35731d8f915&_t_=1791708135&kakorrhaphiophobia=1957085
+16:42:15.604 SIGN result: 1eb767338f942454c6b7c35731d8f915
+16:42:15.610 SIGNPARAM param=YWJjZGVm sign=9f8e7d6c
+16:42:15.611 FORMULA A=k1 X=k2 param=YWJjZGVm sign=9f8e7d6c
+16:42:15.907 RC4 decrypt key=b64[128]YjI2NzRiMjhhYmRjOGRmM2Y1ZTBkODkxNTU1OWJmMWI2YTUzZTk1YmRkM2UzOTNkMDk3ZDFhMzNlZDRhNGU0ODg5OWIzZjhiOGEyOTFiOTAyOGQ0MTUxYTg0ZDUxYjkwMzFjZDIyOTQxYWYxZDk4OThiYzViYTcwMzAzZTc1NjI= in=b64[44]qvy2Vqa/TjDT5yl04M0R1rHr/3PaQEM4gPrITX0h4iWALca92tXZI1my1HQ=: b64[44]eyJtZDUiOiIiLCJ1cmwiOiIiLCJ2ZXJzaW9uIjoiIiwiamFyVGltZSI6MH0=
+16:42:15.908 NET DECRYPT in: com.homework.fastad.model.ComplianceFilter@698a758
+16:42:15.909 NET DECRYPT out: com.homework.fastad.model.ComplianceFilter@698a758
+16:42:15.910 H5 n out: {"md5":"","url":""}
+16:42:15.911 H5 DECRYPT in: YWJjZGVm
+16:42:15.912 H5BRIDGE downloadMedia count=1 {"type":"1","url":"https://cdn.example/a.jpg"}
+16:42:15.913 H5BRIDGE getuserinfo count=3 {"from":"page"}
+16:42:15.914 BRIDGE downloadMedia type=1 url=https://cdn.example/a.jpg
+16:42:15.920 BRIDGE downloadMedia type=2 url=https://cdn.example/b.jpg
+16:42:15.930 BRIDGE getuserinfo asked identity=student_42
+16:42:15.935 BRIDGE payorder submit len=48 keys=2:goodsId,price pid=vip
+16:42:15.936 BRIDGE payorder submit len=0 empty pid=vip
+16:42:15.937 BRIDGE payorder submit len=9 not-json pid=vip
+16:42:15.938 BRIDGE decodeHttpRequest url=api.example.com/kdapi/x shouldDecode=1 params=keys=2:page,size
+16:42:15.939 BRIDGE decodeHttpRequest url=(empty) shouldDecode=? params=not-object
+16:42:15.940 PAGEREQ from=EncryptDataRequestAction url=api.example.com/kdapi/y params=keys=2:page,size method=1
+16:42:15.941 PAGEREQ from=(unknown) url=(empty) params=not-object method=?
+16:42:15.940 GUARD blocked=core_showDebuger reason=blacklist url= #1
+16:42:15.941 GUARD blocked=core_httpRequest reason=host_not_allowed url=https://evilkuaiduizuoye.com/x #2
+16:42:15.942 GUARD blocked=core_httpRequest reason=host_not_allowed url=/local/path #3
+16:42:16.000 ADSLOT call aj.a.d(3) #1
+16:42:16.001 ADSLOT ret  aj.a.d(3) -> false
+16:42:16.002 ADSLOT call di.a.d(3) #2
+16:42:16.003 ADSLOT ret  di.a.d(3) -> null
+16:42:16.004 ADSLOT ret  di.a.j() -> false
+16:42:16.002 blocked ad slot read: aj.a.f(7) -> null
+16:42:16.005 blocked ad slot read: di.a.d(501)
+16:42:16.030 ADBLOCK di.a.j -> false
+16:42:16.031 ADBLOCK di.a.k -> true
+16:42:16.010 ROUTE zyb://webview/main abc123 | from=com.kuaiduizuoye.scan.MainActivity.onCreate
+16:42:16.020 NAV index.html | https://www.kuaiduizuoye.com/h5/index.html
+16:42:16.021 NAVACT MainActivity
+16:42:16.030 HDR(static) Content-Type=application/json | User-Agent=kuaiduizuoye/7.7.2
+16:42:16.031 HDR(v) www.kuaiduizuoye.com/api/x :: X-Sign=abc | _t_=1791708135
+16:42:16.032 HDR www.kuaiduizuoye.com/api/y :: X-Sign=def
+16:42:16.040 WEBREQ https://www.kuaiduizuoye.com/static/app.js
+16:42:16.041 WEBREQ https://api.kuaiduizuoye.com/v1/feed | X-Sign=abc, token=xyz
+16:42:16.050 EXITCALL #1 com.byazt.a.b.run() blocked=true
+16:42:16.051 EXITSTACK #1 java.lang.System.exit(System.java:1) ⏎ com.byazt.a.b.run(b.java:9)
+16:42:16.070 ROBUST patch lk.f #4dec supported=false redirect=false
+16:42:16.071 ROBUST patch com.kuaiduizuoye.scan.web.actions.FetchPayInfosAction #51fe supported=true redirect=true
+16:42:16.072 ROBUST stack lk.f #4dec AntiDebugThread.run <- Thread.run
+16:42:16.060 EXITCALL #41 com.byazt.a.c.run() blocked=false (stack suppressed)
+16:42:16.120 H5RET postMessage count=3 len=248 {"code":0}
+16:42:16.121 H5RET void count=1 len=4 null
+16:42:16.115 NETERR no=-7 code=签名错误 | 请求失败
+16:42:16.116 NETERR no=0
+16:42:16.068 VIPLIMIT ask product=examRHW used=3
+16:42:16.069 VIPLIMIT result allowed=false remaining=0
+16:42:16.070 VIP unlock applied
+16:42:16.071 NEXIT installed=true control=false selfTest=1 selfProof=2
+16:42:16.075 WATERMARK off applied
+16:42:16.076 POPWIN seen type=winAd block=true action=BLOCK
+16:42:16.077 POPWIN seen type=winUp block=false action=PASS
+16:42:16.078 POPWIN seen type=winVIPBottom block=true action=OBSERVE
+16:42:16.079 POPWIN seen type=winActivity_7 block=true action=BLOCK
+16:42:16.071 UPDATE suppressed force-update popup
+16:42:16.072 UPDATE forceUp 1 -> 0
+16:42:16.080 ONBOARD clicked='跳过' label=skip #1 ok=true
+16:42:16.007 ONBOARD giveup where="activity MainActivity" tries=6 decorReady=false
+16:42:16.081 ONBOARD clicked='以后再说' label=later #2 ok=false
+16:42:16.090 APPSIGN D/DProtect: init failed rc=-1
+16:42:16.100 RC4PT {"title":"三年级口算"}
+16:42:16.101 RC4PT(nontext) len=44 b64=3q2+7w==
+16:42:16.102 RC4UP plain request body
+16:42:16.103 RC4UP(nontext) len=12 b64=AAECAwQFBgcICQoL
+16:42:16.200 this line has no known prefix at all
+16:42:16.200 REQBODY text HWRequest len=248 {"a":1}
+16:42:16.201 REQBODY bin HWRequest len=20480
+16:42:16.202 REQBODY params Popwincontent$Input n=29 a=1&b=2 …+5
+16:42:16.203 REQBODY json len=88 {"a":1,"b":"x"}
+REQBODY json len=88 {"a":1}
+16:42:16.203 RESPBODY text status=200 len=1024 {"errNo":0}
+16:42:16.204 RESPBODY bin status=200 len=65536
+16:42:16.205 RESPBODY unreadable fields=a,b,c
+16:42:16.210 PCTRL aiwriting=1 book=0 correctsearch=1 picsearch=? mask=0x5
+16:42:16.211 PCTRLW aiwriting=1 book=0 correctsearch=1 picsearch=? mask=0x5 from=2 userMode=?
+16:42:16.212 PCTRL unavailable reason=not_logged_in
+16:42:16.213 PCTRLW unavailable reason=no_write_permission
+16:42:16.500 PROMO blocked winVIPBottom
+16:42:16.501 MD3 window themed

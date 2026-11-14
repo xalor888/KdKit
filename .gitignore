@@ -1,0 +1,42 @@
+# ── 本地证据与逆向产物（不进仓库）────────────────────────────
+# 内部轮次日志/报告含真实接口响应与设备指纹，只留本地。
+ROADMAP.md
+REPORT.md
+README-internal.md
+# 解包树、抓取、轮次日志、截图现场都在 work/ 下，体积以 GB 计且含第三方 App 的内容。
+work/
+ZZZZ
+
+# 目标 App 的样本包（版权属于原厂，不随仓库分发）
+*.apk
+com.kuaiduizuoye.scan-*
+
+# 设备环境（Magisk / Vector 的二进制与镜像）—— 设备配方写在 ROADMAP 里，不随仓库分发
+infra/
+
+# 目标 App 的页面样本（第三方内容，仅本地分析用）
+h5/
+
+# ── 构建产物 ───────────────────────────────────────────────
+.gradle/
+build/
+module/build/
+module/app/build/
+module/.gradle/
+module/.kotlin/
+.kotlin/
+*.iml
+.idea/
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Python 字节码
+__pycache__/
+*.pyc
+
+# ── 杂项 ──────────────────────────────────────────────────
+*.hprof
+*.log
+.DS_Store
