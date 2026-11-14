@@ -149,6 +149,7 @@ object SettingsEntry : SwitchFeature(
      */
     private fun script(): String = """
         (function () {
+          // 只在设置页留下一条痕迹，方便真机排障：console 输出会进 logcat 的 chromium 通道
           if (window.__kdkit_settings_entry) { return; }
           window.__kdkit_settings_entry = 1;
           var ROW_ID = 'kdkit-settings-row';
@@ -208,13 +209,25 @@ object SettingsEntry : SwitchFeature(
             var anchor = null;
             for (var i = 0; i < MARKS.length && !anchor; i++) { anchor = leafByText(MARKS[i]); }
             if (!anchor) { console.log('[KdKit] insert: no anchor'); return false; }
+            /**
+             * 从文案元素往上走，直到"整行的宽度"（≥ 视口 70%）。
+             *
+             * 原来的条件是"父元素文本和文案完全相同" —— 快对设置行是
+             * 「图标 + 文案 + 右箭头」，父元素文本里还带箭头字符，条件永远不成立，
+             * 于是只克隆了文案那个 300px 宽的小块（2026-11-15 模拟器实测：
+             * 行确实插进去了，但只有"KdKit 模块设置"几个字，没有整行热区）。
+             */
             var row = anchor;
-            while (row.parentNode && norm(row.parentNode.textContent) === norm(anchor.textContent)) {
+            var viewportW = document.documentElement.clientWidth || 360;
+            while (row.parentNode) {
+              var rect = row.getBoundingClientRect();
+              if (rect.width >= viewportW * 0.7) { break; }
               row = row.parentNode;
             }
             var mine = row.cloneNode(true);
             mine.id = ROW_ID;
             mine.style.cursor = 'pointer';
+            mine.style.width = '100%';
             var nodes = [];
             var walker = document.createTreeWalker(mine, NodeFilter.SHOW_TEXT, null, false);
             while (walker.nextNode()) { nodes.push(walker.currentNode); }
@@ -238,7 +251,7 @@ object SettingsEntry : SwitchFeature(
           }
 
           /* ── 重插：observer 只挂在「确认是设置页」的时候，且带冷却 ────────── */
-          var lastRun = 0;
+          var lastRun = -1e9;   // 保证第一次一定不被冷却挡掉
           var pending = false;
           function ensure() {
             if (document.getElementById(ROW_ID)) { return; }   // 最便宜的一步，已存在就收工
@@ -278,6 +291,9 @@ object SettingsEntry : SwitchFeature(
             if (++tries < 8) { setTimeout(boot, 600); }
           }
           setTimeout(boot, 300);
+          // 兜底：observer 万一没挂上（body 被替换等），这两个定时器仍会把行插进去
+          setTimeout(ensure, 900);
+          setTimeout(ensure, 2200);
         })();
     """.trimIndent()
 }
