@@ -18,7 +18,7 @@
 | 证书 SHA-1 | `8ff210972acfc207a36ae964c98c1de2a81220ae` |
 | 公钥 SHA-256 | `ee17247fd96bd153a9c0be2aa1bab608440d401d6a1d318cad9ac0fbe0ab262c` |
 
-文件指纹同时写在 [`release-keystore.sha256`](release-keystore.sha256)，CI 在还原 keystore 后立刻 `sha256sum -c` 校验：还原成别的 keystore 会直接失败，不会静默签出错误产物。
+文件指纹同时写在 [`release-keystore.sha256`](release-keystore.sha256)（`sha256sum` 原生格式，内容为 `291ae8…b8b4  kdkit-release.jks`）。CI 在还原 keystore 后立刻 `shasum -c` 校验：还原成别的 keystore 会直接失败，不会静默签出错误产物（本地已实测 `kdkit-release.jks: OK`）。
 
 ## 2. 密码放在哪里（为什么不写在本文里）
 
@@ -45,7 +45,7 @@ sed -n 's/^storePassword=//p' signing/local.properties
   -alias kdkit -dname "CN=KdKit,O=xalor,C=CN" -storetype PKCS12 \
   -keystore signing/kdkit-release.jks -storepass "$NEW_PW" -keypass "$NEW_PW"
 # 2) 更新 signing/local.properties 与 4 个 secret，重算 release-keystore.sha256 并提交
-shasum -a 256 signing/kdkit-release.jks | awk '{print $1}' > signing/release-keystore.sha256
+printf '%s  kdkit-release.jks\n' "$(shasum -a 256 signing/kdkit-release.jks | awk '{print $1}')" > signing/release-keystore.sha256
 gh secret set KEYSTORE_BASE64   -R xalor888/KdKit < <(base64 -i signing/kdkit-release.jks | tr -d '\n')
 gh secret set KEYSTORE_PASSWORD -R xalor888/KdKit --body "$NEW_PW"
 gh secret set KEY_PASSWORD      -R xalor888/KdKit --body "$NEW_PW"

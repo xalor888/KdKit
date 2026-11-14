@@ -42,7 +42,7 @@ jobs:
           chmod 600 signing/kdkit-release.jks
           sha256sum signing/kdkit-release.jks
           # 仓库里保存了 keystore 的 SHA-256 指纹，restore 到别的 keystore 会在这里失败
-          sha256sum -c signing/release-keystore.sha256
+          ( cd signing && sha256sum -c release-keystore.sha256 )
 
       - name: Write signing/local.properties
         env:
