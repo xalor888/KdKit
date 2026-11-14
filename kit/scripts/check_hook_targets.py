@@ -251,6 +251,9 @@ def collect_targets(module_dir):
             for m in PAIR_RE.finditer(text):
                 found.append((expand(m.group(1), consts), expand(m.group(2), consts), m.start()))
             # 直接调 `XposedHelpers.*`：与 `Xp.hook` 是同一种东西，只是没包记账层。
+            # 第一实参是**局部变量**（`findAndHookMethod(cand, cl, …)`）⇒ 类名在运行时才定，
+            # 静态无从校验：`consts.get` 取不到就留空串，由下面的 `if not cls` 丢掉这条。
+            # （`Xp` 的候选名循环正是这个形态；不这么判会在门禁里造出 `cand.` 这样的假目标。）
             for m in XPOSED_METHOD_RE.finditer(text):
                 found.append((expand(m.group(1) or consts.get(m.group(2), ''), consts),
                               expand(m.group(3), consts), m.start()))
@@ -327,7 +330,21 @@ def main(argv):
     print(f'[check] {len(index)} classes indexed from {a.smali} '
           f'({", ".join(os.path.basename(r) for r in smali_roots(a.smali))})')
     targets = collect_targets(a.module)
-    print(f'[check] {len(targets)} hook target(s) declared in the module')
+    # 宿主混淆名映射：源码里的字面量是**基线（7.10.2/1860）**名，而 1865 那棵树里
+    # 同一个逻辑目标叫别的名字。解析放在 usage 之前，这样
+    #   ① 存在性/方法名/签名都查**这棵树真实的那一侧**；
+    #   ② 调用方证据（SMALI-USAGE）也查那一侧 —— 否则会拿"同名错类"的引用统计
+    #      去解释一条其实指向另一个类的钩子（`di.a` 在 1865 里就是另一个类）。
+    # 表外的目标原样返回，行为与加表之前逐字节相同（见 hook_vocab.resolve_target）。
+    ver = vocab.tree_version(a.smali)
+    resolved = []
+    for cls, meth, where in targets:
+        checked, alias = vocab.resolve_target(cls, ver, a.module)
+        resolved.append((cls, meth, where, checked, alias))
+    if any(alias for *_x, alias in resolved):
+        n_alias = sum(1 for *_x, alias in resolved if alias)
+        print(f'[check] host-map: tree={ver} — {n_alias} 个目标的类名来自 HostMap 翻译'
+              f'（源码写基线名，这棵树里叫另一个名字）')
 
     rows, bad, dead, weak = [], 0, [], []
     # 目标名必须是**合法 Java 标识符**。这一层存在的原因（2026-10-26 第 40 轮）：
@@ -345,9 +362,10 @@ def main(argv):
             print(f'  ✗ {c!r}{"." + m if m else ""}   ({w})')
         bad += len(malformed)
 
-    usage = usage_of(a.smali, targets, enabled=not a.no_callers)
-    for cls, meth, where in targets:
-        path = index.get(cls)
+    usage = usage_of(a.smali, [(c, m, w) for _l, m, w, c, _a in resolved],
+                     enabled=not a.no_callers)
+    for cls, meth, where, checked, alias in resolved:
+        path = index.get(checked)
         if path is None and re.match(r'^(android|java|javax|dalvik|libcore)\.', cls):
             status = 'OK(platform)'
         elif path is None:
@@ -363,7 +381,7 @@ def main(argv):
         else:
             status = 'MISSING-METHOD'
 
-        use = usage.get((cls, meth))
+        use = usage.get((checked, meth))
         if status in (vocab.VERDICT_OK, vocab.VERDICT_LOAD) and use is not None:
             if use.verdict == 'DEAD':
                 # 类/方法都在，但 APK 里没有任何字节提到它 ⇒ 钩了必然空转。
@@ -377,8 +395,10 @@ def main(argv):
         if status.startswith('MISSING') or status == 'DEAD-TARGET':
             bad += 1
         rows.append({'class': cls, 'method': meth, 'where': where, 'status': status,
+                     'checked': checked, 'alias': alias,
                      'usage': use.to_dict() if use is not None else None})
         print(f'  {status:15s} {cls}{"." + meth if meth else ""}   ({where})'
+              + (f'   [alias→{checked}]' if alias else '')
               + (f'   [{use.label()}]' if use is not None else ''))
 
     print(f'[check] {len(targets) - bad}/{len(targets)} resolved')

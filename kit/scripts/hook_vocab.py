@@ -248,3 +248,96 @@ def repo_path(relative: str) -> str:
     here = os.path.dirname(os.path.abspath(__file__))     # kit/scripts
     root = os.path.dirname(os.path.dirname(here))          # 仓库根
     return os.path.join(root, relative)
+
+
+# ── 宿主混淆名映射（`HostMap.kt`） ──────────────────────────────────────────────
+#
+# 为什么门禁要读模块源码里的这张表：4 个钩子的类名在 **7.10.2/1860** 与
+# **6.21.11/1865** 之间整个重排了（`di.a`/`dj.a`/`vm.g`/`fh.a` → `bi.a`/`bj.a`/`tm.g`/`dh.a`）。
+# 模块的调用点**保留基线字面量**（这样文档、共享表、`PARADIGM` 都仍按基线名对齐），
+# 由 `HostMap` 在运行时翻译。于是"在 1865 的树上跑门禁"必须先按同一张表把字面量
+# 解析到**这棵树里真实存在的那一侧**，否则门禁会把 4 类目标全报成 MISSING ——
+# 而那正是"代码其实是对的、门禁说错了"的假红，比漏报更快教人无视门禁。
+#
+# 单一定义处：④ 与 ⑤ 都调 `resolve_target()`，两边不可能给出不同答案
+# （这个仓库已经因为"两份实现互相不一致"踩过一次，见 `check_hook_targets.py` 的注释）。
+#
+# 表的一行就是 `Rename("id", "基线名", "1865 名")`。**这个文本形状是契约**：
+# `HostMap.kt` 的注释里也写着同一句，改格式会让这里解析不到（`host_map()` 返回空表 ⇒
+# 所有目标退回"按字面量查"，1865 一侧立刻变红，不会静默错判）。
+HOSTMAP_RE = _re.compile(r'Rename\(\s*"([^"]+)"\s*,\s*"([^"]+)"\s*,\s*"([^"]+)"\s*\)')
+
+#: 1865 = 内测包 6.21.11（`work/apktool_out_6211/apktool.yml`）。
+VERSION_CODE_1865 = 1865
+
+_HOSTMAP_CACHE = {}
+_VERSION_CACHE = {}
+
+
+def host_map(module_dir: str = None):
+    """读 `HostMap.kt` 的 `Rename(...)` 行 -> {任意一侧的名字: (id, 基线名, 1865 名)}。
+
+    三种写法（id / 基线名 / 1865 名）都作为键，所以调用点无论写哪一侧都能查到同一条。
+    """
+    import os
+    if module_dir is None:
+        module_dir = repo_path('module/app/src/main/java/dev/xalor/kdkit')
+    if module_dir in _HOSTMAP_CACHE:
+        return _HOSTMAP_CACHE[module_dir]
+    path = os.path.join(module_dir, 'HostMap.kt')
+    table = {}
+    if os.path.isfile(path):
+        for m in HOSTMAP_RE.finditer(read_text(path)):
+            # Kotlin 里 `$` 在字符串字面量中必须写成 `\$`（内部类名因此写作 `ps.f\$e`），
+            # 而运行时字符串与 smali 描述符里都是 `ps.f$e`。不反转义，键就与调用点的
+            # `"ps.f\$e"` 对不上 —— 表现是"表里有这条、但永远命中不了"（静默失效）。
+            # 三个字段都归一，`resolve_target()` 返回表里的值 ⇒ 自动是对的。
+            ident, base, new = (m.group(1).replace('\\$', '$'),
+                                m.group(2).replace('\\$', '$'),
+                                m.group(3).replace('\\$', '$'))
+            entry = (ident, base, new)
+            table[ident] = entry
+            table[base] = entry
+            table[new] = entry
+    _HOSTMAP_CACHE[module_dir] = table
+    return table
+
+
+def tree_version(smali_root: str):
+    """从 `<tree>/apktool.yml` 读 versionCode（读不到返回 None）。
+
+    为什么要读树而不是命令行参数：同一条命令要在两棵树上跑，人不可能每次记得
+    传 `--version`；而 `apktool.yml` 是 apktool 自己写的，**它不会撒谎**。
+    """
+    import os
+    if smali_root in _VERSION_CACHE:
+        return _VERSION_CACHE[smali_root]
+    code = None
+    path = os.path.join(smali_root, 'apktool.yml')
+    if os.path.isfile(path):
+        m = _re.search(r'^\s*versionCode:\s*(\d+)', read_text(path), _re.M)
+        if m:
+            code = int(m.group(1))
+    _VERSION_CACHE[smali_root] = code
+    return code
+
+
+def resolve_target(cls: str, version_code, module_dir: str = None):
+    """把源码里的类字面量解析到**这棵树上该查的那个名字**。
+
+    返回 `(name_to_check, alias_note_or_None)`：
+      * 表外的类 —— 原样返回，`None`（绝大多数目标走这条，行为与加表之前逐字节相同）；
+      * 表内、且这棵树就是该侧 —— 原样返回，`None`（基线树上是常态）；
+      * 表内、跨侧 —— 返回该侧的名字 + 一条 `alias a→b` 说明，让报告里**看得见**翻译。
+
+    版本未知（`apktool.yml` 缺失）时按基线处理：那时的行为与加表之前一致，
+    宁可"老行为"也不要"猜一个新的"。
+    """
+    entry = host_map(module_dir).get(cls)
+    if not entry:
+        return cls, None
+    _ident, base, new = entry
+    want = new if version_code == VERSION_CODE_1865 else base
+    if want == cls:
+        return cls, None
+    return want, f'{cls}->{want}'

@@ -9,7 +9,9 @@ import dev.xalor.kdkit.util.KdLog
  *
  * 为什么需要：整套钩子都建立在 **7.10.2 (1860)** 的混淆名之上（`dj.a` / `di.a` / `vm.g` …；
  * 7.10.0 是同一套名字（`module/MIGRATION-7102.md`），7.9.0 见 `module/MIGRATION-710.md`，
- * 7.7.2 更旧的见 `module/MIGRATION-790.md`）。
+ * 7.7.2 更旧的见 `module/MIGRATION-790.md`）。**6.21.11 (1865) 是另一套映射**：
+ * `di.a` 在那一版里指的是**另一个类**（有 `d` 但没有 `d(I)`），所以那一版靠 `HostMap` 翻译，
+ * 不是靠"同名"。—— 这一点与 7.10.0/7.9.0 的"只差常量"不是同一类兼容。
  * App 一旦自动更新，这些名字会变，表现是"功能静默失效"，而不是崩溃 ——
  * 最难查的那种故障。所以启动时把版本号写进日志第一条与抓取文件头部：
  *
@@ -39,7 +41,20 @@ object HostVersion {
      * **Robust `PatchProxy` 的方法索引**（紧跟 `invoke-static … PatchProxy->proxy` 的 I 参数），
      * 因此它的平移量随"新插桩方法数"变化，不是资源 ID 的变化。
      */
-    private val COMPATIBLE_VERSIONS = setOf("7.10.0/1850", "7.9.0/1840")
+    private val COMPATIBLE_VERSIONS = setOf(
+        "7.10.0/1850",
+        "7.9.0/1840",
+        // 6.21.11 / 1865 —— **内测构建**（versionCode 比 1860 大，但版本号更旧，是另一个发布线）。
+        //
+        // 它与上面两版**不同类**：7.10.0 / 7.9.0 是"同一套混淆名、只差常量"，
+        // 而 1865 的 R8 映射整个重排了 —— `di.a` 在这版里是**另一个类**（有 `d` 但没有 `d(I)`），
+        // 于是旧钩子在这里不是"找不到类"而是"钩到错的方法"，比 MISSING 更难发现。
+        // 类名的翻译由 `HostMap` 承担（表本体在 `HostMap.RENAMES`，表的格式被
+        // `kit/scripts/hook_vocab.py::host_map()` 解析），钩子安装处由 `Xp` 依次试候选名。
+        // 证据与逐条依据：广告/签名观测见 `work/compat1865/ADS.md`，宿主角见
+        // `work/compat1865/HOST.md`。
+        "6.21.11/1865",
+    )
 
     @Volatile
     var versionName: String = "?"

@@ -17,6 +17,10 @@ private const val MODEL = "$PKG.common.net.model.v1"
  * `lk.a` is the app's splash-ad controller: `j(Activity)` launches ResumeSplashActivity and
  * `k()` decides whether an ad slot is configured at all. Neutralising both means the splash
  * screen never appears.
+ *
+ * 混淆名：基线（7.10.2/1860）是 `dj.a`，**1865（6.21.11）叫 `bj.a`**（`HostMap` id
+ * `ads.splash`）。调用点照基线名写，翻译在 `HostMap`/`Xp` 的候选循环里 ——
+ * 不要在这里改成新名，那会打断 7.10.2。证据见 `work/compat1865/ADS.md` §3.1。
  */
 object RemoveSplashAd : SwitchFeature(
     id = "rm_splash",
@@ -41,6 +45,10 @@ object RemoveSplashAd : SwitchFeature(
  * `aj.a` is the runtime accessor for InitAdConfig ad slots. Returning null / false for every
  * slot removes the app's *own* ad inventory before any renderer, mediation SDK or splash
  * controller can act on it — this is the broadest single cut.
+ *
+ * 混淆名：`aj.a` 是 7.7.2 的叫法，7.9.0 起是 `di.a`（本文件的字面量），
+ * **1865 里是 `bi.a`**（`HostMap` id `ads.slot`）。1865 的 `di.a` 是**另一个类** ——
+ * 它有 `d`/`f` 但签名不同，所以旧钩子在那里是"假命中"，不是"没找到"。
  */
 object RemoveAdSlotConfig : SwitchFeature(
     id = "rm_adconfig",
@@ -165,6 +173,10 @@ object RemovePopupAd : SwitchFeature(
         val g = id
         var n = 0
         // 类名写字面量：静态门禁按字面量解析（用 `dialog.name` 会让这条钩子失去校验）。
+        //
+        // 1865 的同名宿主类**类名不变**，但 `g` 的第二个形参换了短名：`fh.a` → `dh.a`
+        // （`HostMap` id `ads.popup.showArg`；两个接口的方法集逐条相同）。
+        // 所以这里仍写基线名，运行时 `clazzOrNull` 会给出 1865 的那一侧。
         // 第二个形参 `ci.a` 只能在运行时解析（它是混淆名，脚本无法从字面量推出），
         // 所以仍用 clazzOrNull。
         //

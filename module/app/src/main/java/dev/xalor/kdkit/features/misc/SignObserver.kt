@@ -85,6 +85,9 @@ object SignObserver : SwitchFeature(
         n += hook("com.zuoyebang.baseutil.a", "b") { p ->
             record("RC4KEY b(${p.args.firstOrNull()})", p.result?.toString())
         }
+        // 混淆名：基线（7.10.2/1860）是 `vm.g`，**1865 里叫 `tm.g`**（`HostMap` id `crypto`；
+        // 28 个方法逐条描述符相同、36 条 `RC4Helper` 字符串相同、调用方文件列表相同）。
+        // 下面所有 `vm.g` 字面量都靠 `Xp` 的候选循环解析到当前宿主的那一侧。
         n += hook("vm.g", "h") { p ->
             if (pairsBudget("h5dec")) record("H5 DECRYPT in", p.args.firstOrNull()?.toString())
             record("H5 DECRYPT out", p.result?.toString())

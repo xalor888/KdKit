@@ -262,8 +262,15 @@ def import_map(text):
     return out
 
 
-def collect(module_dir):
-    """返回 [{cls, meth, sig, where}]，sig=None 表示静态无法确定。"""
+def collect(module_dir, version_code=None):
+    """返回 [{cls, meth, sig, where}]，sig=None 表示静态无法确定。
+
+    [version_code] 是**这棵树**的宿主版本（`hook_vocab.tree_version()`）。它只影响一件事：
+    `Xp.clazz("…")` / `Xp.clazzOrNull("…")` 里的字面量是基线名，而同一逻辑目标在 1865 里
+    叫另一个名字 ⇒ 形参描述符必须按**这棵树真实的那一侧**算（`Lfh/a;` vs `Ldh/a;`），
+    否则要么假红（`(ZLfh/a;)` 对不上 1865 的 `(ZLdh/a;)`），要么退化成 `*` 占位符、
+    把这 4 条的签名校验悄悄丢掉。
+    """
     rows = []
     for base, _d, files in os.walk(module_dir):
         if os.sep + 'build' + os.sep in base + os.sep:
@@ -278,7 +285,7 @@ def collect(module_dir):
             imports = import_map(text)
             # 本地 val 指向的类（`val returnCb = Xp.clazzOrNull("...")`）也能静态解析
             clazz_vals = {
-                name: expand_all(lit, consts)
+                name: vocab.resolve_target(expand_all(lit, consts), version_code, module_dir)[0]
                 for name, lit in CLAZZ_VAL_RE.findall(text)
             }
             classref_vals = {
@@ -300,9 +307,14 @@ def collect(module_dir):
             # 第四种形态：直接调 `XposedHelpers.findAndHookMethod` / `findAndHookConstructor`。
             # 它们**有形参**（classLoader 之后的那串），所以走签名比对路径。
             # `Xp.classLoader` 那一段由正则吃掉，不在 `split_args` 看到的文本里。
-            calls += [(m.group(1) or m.group(2), m.group(3), m.end(), False)
+            # 第一实参是**局部变量**（`findAndHookMethod(cand, cl, …)`）时**不能**当类名：
+            # 那不是"类名叫 cand"，而是"类名在运行时才定"（`Xp` 的候选名循环就是这种形态）。
+            # 旧实现取 `m.group(2)` 原样，于是 `Xp.kt` 自己造出两条假目标
+            # `cand.<init>()` / `cand.`，把 127 条撑成 128 条、并让 7102 报"1 不符" ——
+            # 门禁自己造出来的假红。裸标识符只认本文件的 `const val`，其余跳过。
+            calls += [(m.group(1) or consts.get(m.group(2), ''), m.group(3), m.end(), False)
                       for m in vocab.XPOSED_METHOD_RE.finditer(text)]
-            calls += [(m.group(1) or m.group(2), '<init>', m.end(), False)
+            calls += [(m.group(1) or consts.get(m.group(2), ''), '<init>', m.end(), False)
                       for m in vocab.XPOSED_CTOR_RE.finditer(text)]
             # 循环变量方法名：按文件内的 `listOf(...)` **作用域**展开成字面量。
             # 不能用"变量名 -> 列表"的全局字典：`AdFeatures.kt` 有两个同名 `m`
@@ -377,7 +389,7 @@ def collect(module_dir):
                         desc.append(to_desc(raw))
                     elif CLAZZ_INLINE_RE.match(name):
                         lit = expand_all(CLAZZ_INLINE_RE.match(name).group(1), consts)
-                        desc.append(to_desc(lit))
+                        desc.append(to_desc(vocab.resolve_target(lit, version_code, module_dir)[0]))
                     elif name in clazz_vals:
                         desc.append(to_desc(clazz_vals[name]))
                     elif name in classref_vals:
@@ -475,11 +487,17 @@ def main(argv):
     a = ap.parse_args(argv[1:])
 
     idx = index_classes(a.smali)
-    rows = collect(a.module)
+    ver = vocab.tree_version(a.smali)
+    rows = collect(a.module, ver)
+    # 类名同样按 HostMap 解析到**这棵树真实的那一侧**：源码里写的是基线名，
+    # 1865 里同一个逻辑目标叫另一个名字；不翻译就会把 4 类钩子全报成 MISSING-CLASS
+    # （它们是好的，只是名字换了 —— 假红比漏报更快教人无视门禁）。
+    for r in rows:
+        r['checked'], r['alias'] = vocab.resolve_target(r['class'], ver, a.module)
     bad = unknown = 0
     out = []
     for r in rows:
-        path = idx.get(r['class'])
+        path = idx.get(r['checked'])
         if path is None:
             status = 'OK(platform)' if re.match(r'^(android|java|javax)\.', r['class']) else 'MISSING-CLASS'
         elif r['method'] not in descriptors(path):
@@ -527,7 +545,8 @@ def main(argv):
             unknown += 1
         out.append({**r, 'status': status})
         if not a.quiet:
-            print(f'  {status:45s} {r["class"]}.{r["method"]}{r["sig"] or ""}   ({r["where"]})')
+            print(f'  {status:45s} {r["class"]}.{r["method"]}{r["sig"] or ""}   ({r["where"]})'
+                  + (f'   [alias→{r["checked"]}]' if r.get('alias') else ''))
             if status.startswith('SIGNATURE-MISMATCH'):
                 print(f'  {"":45s} APK 里实际是: {", ".join(r.get("actual", []))}')
             elif status.startswith('UNKNOWN') and r.get('actual'):

@@ -3,6 +3,7 @@ package dev.xalor.kdkit.util
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
+import dev.xalor.kdkit.HostMap
 import dev.xalor.kdkit.config.KdConfig
 
 /**
@@ -55,8 +56,28 @@ object Xp {
         }
     }
 
-    fun clazz(name: String, cl: ClassLoader? = classLoader): Class<*> =
-        XposedHelpers.findClass(name, cl)
+    /**
+     * 解析类，**必须成功**（失败抛出）。
+     *
+     * 与 [clazzOrNull] 的唯一区别是"表外的类找不到时抛不抛"。候选名的处理必须与
+     * [clazzOrNull] 完全一致 —— 否则会出现一种很难查的失效：
+     * `Xp.clazz("yc.a")` 在 1865 里 **能找到类**，但那已经是另一个类（R8 把旧名回收了），
+     * `findClass` 返回非空、`findAndHookMethod` 随即因形参不符而失败 ——
+     * 钩子"装过、返回 false、功能静默失效"，而日志里只有一行 `hook failed`。
+     * 走候选则先拿 1865 的那一侧（`wc.a`），形参类型直接对上。
+     */
+    fun clazz(name: String, cl: ClassLoader? = classLoader): Class<*> {
+        prefetchHostMap()
+        var last: Throwable? = null
+        for (cand in HostMap.candidates(name)) {
+            try {
+                return XposedHelpers.findClass(cand, cl)
+            } catch (t: Throwable) {
+                last = t
+            }
+        }
+        throw last ?: ClassNotFoundException(name)
+    }
 
     /**
      * 解析类，失败返回 null。
@@ -68,14 +89,40 @@ object Xp {
      * 代价：同一功能多次调用同一个缺失类会重复计数，所以去重交给 [HookAudit]
      * 的列表（按 `功能:类` 字符串去重后再打印）。
      */
-    fun clazzOrNull(name: String, cl: ClassLoader? = classLoader): Class<*>? =
-        try {
-            XposedHelpers.findClass(name, cl)
-        } catch (t: Throwable) {
-            HookAudit.recordSkipped(owner.get(), "$name (class not found)")
-            KdLog.d("clazzOrNull miss: $name")
-            null
+    fun clazzOrNull(name: String, cl: ClassLoader? = classLoader): Class<*>? {
+        prefetchHostMap()
+        val cands = HostMap.candidates(name)
+        for (cand in cands) {
+            try {
+                return XposedHelpers.findClass(cand, cl)
+            } catch (_: Throwable) {
+                // 换名候选：继续试下一个
+            }
         }
+        HookAudit.recordSkipped(owner.get(), "${cands.joinToString("|")} (class not found)")
+        KdLog.d("clazzOrNull miss: $name (tried $cands)")
+        return null
+    }
+
+    @Volatile
+    private var hostMapLogged = false
+
+    /**
+     * 让 [HostMap] 的版本判定在装钩子之前就定型。
+     *
+     * 为什么需要：`HostVersion.read()` 在 `handleLoadPackage` 早期常常拿不到 Context，
+     * 于是 `versionCode` 暂为 -1、由后台线程 3 s 后再读。若此时就开始装钩子，
+     * `HostMap` 会在"版本未知"下选候选 —— 走的是指纹兜底路径，能对，但那是**兜底**，
+     * 不该是常态。这里先问一次，把判定（版本号优先 / 指纹次之）落在第一条钩子之前。
+     */
+    fun prefetchHostMap() {
+        HostMap.is1865()
+        if (!hostMapLogged) {
+            hostMapLogged = true
+            // 一行结论：这一侧用的是哪套名字。换版排障时，先看这行再看"少挂了哪几条"。
+            KdLog.i(HostMap.describe())
+        }
+    }
 
     /**
      * Hook 一个方法。返回 false 表示目标缺失/签名不符（已记账，不抛）。
@@ -99,6 +146,29 @@ object Xp {
         return KdConfig.isOn(gate, GatePolicy.defaultFor(gate))
     }
 
+    /**
+     * 回调体（before/after 两份）的**唯一构造点**。
+     *
+     * 抽出来不是"为了整洁"，而是为了让 [hook] / [hookCtor] 走同一套候选名循环时，
+     * 两个回调里的 gate 判据仍然各判一次（`check_hook_gate_predicate.py` 按"回调数 ≥
+     * gate 判据数"钉住它；删掉这里的一行，那道门禁就会红）。
+     */
+    private fun callback(
+        gate: String?,
+        onBefore: ((XC_MethodHook.MethodHookParam) -> Unit)?,
+        onAfter: ((XC_MethodHook.MethodHookParam) -> Unit)?,
+    ): XC_MethodHook = object : XC_MethodHook() {
+        override fun beforeHookedMethod(param: MethodHookParam) {
+            if (!gateOpen(gate)) return
+            onBefore?.invoke(param)
+        }
+
+        override fun afterHookedMethod(param: MethodHookParam) {
+            if (!gateOpen(gate)) return
+            onAfter?.invoke(param)
+        }
+    }
+
     fun hook(
         className: String,
         methodName: String,
@@ -108,26 +178,27 @@ object Xp {
         onBefore: ((XC_MethodHook.MethodHookParam) -> Unit)? = null,
         onAfter: ((XC_MethodHook.MethodHookParam) -> Unit)? = null,
     ): Boolean {
-        val tag = "$className.$methodName"
-        return try {
-            XposedHelpers.findAndHookMethod(className, cl, methodName, *paramTypes, object : XC_MethodHook() {
-                override fun beforeHookedMethod(param: MethodHookParam) {
-                    if (!gateOpen(gate)) return
-                    onBefore?.invoke(param)
-                }
-                override fun afterHookedMethod(param: MethodHookParam) {
-                    if (!gateOpen(gate)) return
-                    onAfter?.invoke(param)
-                }
-            })
-            HookAudit.record(owner.get(), tag, true)
-            KdLog.d("hooked $tag${if (gate != null) " [gate=$gate]" else ""}")
-            true
-        } catch (t: Throwable) {
-            HookAudit.record(owner.get(), tag, false)
-            KdLog.w("hook failed $tag: $t")
-            false
+        prefetchHostMap()
+        val cb = callback(gate, onBefore, onAfter)
+        var last: Throwable? = null
+        for (cand in HostMap.candidates(className)) {
+            val tag = "$cand.$methodName"
+            try {
+                XposedHelpers.findAndHookMethod(cand, cl, methodName, *paramTypes, cb)
+                HookAudit.record(owner.get(), tag, true)
+                KdLog.d(
+                    "hooked $tag" +
+                        (if (cand != className) " (from $className)" else "") +
+                        (if (gate != null) " [gate=$gate]" else ""),
+                )
+                return true
+            } catch (t: Throwable) {
+                last = t
+            }
         }
+        HookAudit.record(owner.get(), "$className.$methodName", false)
+        KdLog.w("hook failed $className.$methodName (tried ${HostMap.candidates(className)}): $last")
+        return false
     }
 
     /**
@@ -145,30 +216,32 @@ object Xp {
         onBefore: ((XC_MethodHook.MethodHookParam) -> Unit)? = null,
         onAfter: ((XC_MethodHook.MethodHookParam) -> Unit)? = null,
     ): Boolean {
-        val tag = "$className.<init>"
-        return try {
-            XposedHelpers.findAndHookConstructor(className, cl, *paramTypes, object : XC_MethodHook() {
-                override fun beforeHookedMethod(param: MethodHookParam) {
-                    if (!gateOpen(gate)) return
-                    onBefore?.invoke(param)
-                }
-                override fun afterHookedMethod(param: MethodHookParam) {
-                    if (!gateOpen(gate)) return
-                    onAfter?.invoke(param)
-                }
-            })
-            HookAudit.record(owner.get(), tag, true)
-            KdLog.d("hooked ctor $tag${if (gate != null) " [gate=$gate]" else ""}")
-            true
-        } catch (t: Throwable) {
-            HookAudit.record(owner.get(), tag, false)
-            KdLog.w("hook ctor failed $tag: $t")
-            false
+        prefetchHostMap()
+        val cb = callback(gate, onBefore, onAfter)
+        var last: Throwable? = null
+        for (cand in HostMap.candidates(className)) {
+            val tag = "$cand.<init>"
+            try {
+                XposedHelpers.findAndHookConstructor(cand, cl, *paramTypes, cb)
+                HookAudit.record(owner.get(), tag, true)
+                KdLog.d(
+                    "hooked ctor $tag" +
+                        (if (cand != className) " (from $className)" else "") +
+                        (if (gate != null) " [gate=$gate]" else ""),
+                )
+                return true
+            } catch (t: Throwable) {
+                last = t
+            }
         }
+        HookAudit.record(owner.get(), "$className.<init>", false)
+        KdLog.w("hook ctor failed $className.<init> (tried ${HostMap.candidates(className)}): $last")
+        return false
     }
 
     /** Hook 一个类上所有同名方法（任何签名），统一回调。返回成功条数。 */
     fun hookAll(className: String, methodName: String, cl: ClassLoader? = classLoader, cb: XC_MethodHook): Int {
+        prefetchHostMap()
         val c = clazzOrNull(className, cl) ?: run {
             HookAudit.record(owner.get(), "$className.$methodName", false)
             return 0
@@ -178,7 +251,7 @@ object Xp {
             if (m.name != methodName) continue
             try { XposedBridge.hookMethod(m, cb); n++ } catch (_: Throwable) {}
         }
-        HookAudit.record(owner.get(), "$className.$methodName", n > 0)
+        HookAudit.record(owner.get(), "${c.name}.$methodName", n > 0)
         return n
     }
 
@@ -190,6 +263,7 @@ object Xp {
         gate: String? = null,
         cb: (XC_MethodHook.MethodHookParam) -> Unit,
     ): Int {
+        prefetchHostMap()
         val c = clazzOrNull(className, cl) ?: run {
             HookAudit.record(owner.get(), "$className.$methodName", false)
             return 0
@@ -207,7 +281,7 @@ object Xp {
                 n++
             } catch (_: Throwable) {}
         }
-        HookAudit.record(owner.get(), "$className.$methodName", n > 0)
+        HookAudit.record(owner.get(), "${c.name}.$methodName", n > 0)
         return n
     }
 
@@ -219,6 +293,7 @@ object Xp {
         gate: String? = null,
         onAfterCb: (XC_MethodHook.MethodHookParam) -> Unit,
     ): Int {
+        prefetchHostMap()
         val c = clazzOrNull(className, cl) ?: run {
             HookAudit.record(owner.get(), "$className.$methodName", false)
             return 0
@@ -236,7 +311,7 @@ object Xp {
                 n++
             } catch (_: Throwable) {}
         }
-        HookAudit.record(owner.get(), "$className.$methodName", n > 0)
+        HookAudit.record(owner.get(), "${c.name}.$methodName", n > 0)
         return n
     }
 }
