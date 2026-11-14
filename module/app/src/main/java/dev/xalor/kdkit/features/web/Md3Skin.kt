@@ -291,13 +291,14 @@ object Md3Skin : SwitchFeature(
       ? '0 12px 32px rgba(0,0,0,.55), inset 0 -1px 0 rgba(0,0,0,.35)'
       : '0 12px 32px rgba(31,36,58,.14), inset 0 -1px 0 rgba(255,255,255,.35)';
     var DONE = 0;
+    var BLURRED = 0;
     function rgba(cs){
       var m = /rgba?\(([0-9]+), ?([0-9]+), ?([0-9]+)(?:, ?([0-9.]+))?/.exec(cs.backgroundColor);
       return m ? [+m[1], +m[2], +m[3], m[4] === undefined ? 1 : +m[4]] : null;
     }
     function glassify(){
       var els = document.querySelectorAll('div, section, li');
-      for (var i = 0; i < els.length && DONE < 260; i++) {
+      for (var i = 0; i < els.length && DONE < 120; i++) {
         var el = els[i];
         if (el.__kdkit_glass) continue;
         var r = el.getBoundingClientRect();
@@ -319,13 +320,17 @@ object Md3Skin : SwitchFeature(
           (DARK ? 'rgba(255,255,255,.10)' : 'rgba(255,255,255,.45)') + ', ' + SHADOW, 'important');
         // 液态玻璃的关键：背景模糊 + 饱和提升。只在"被我们改造成玻璃"的块上生效，
         // 且白屏自愈（REVERT_IF_BLANK_JS）会兜底撤掉。
-        el.style.setProperty('backdrop-filter', 'blur(18px) saturate(160%) brightness(1.04)', 'important');
-        el.style.setProperty('-webkit-backdrop-filter', 'blur(18px) saturate(160%) brightness(1.04)', 'important');
+        // 真模糊只给最大的 6 块：大面积 backdrop-filter 会把渲染线程压到 ANR（2026-11-14 实测）。
+        if (BLURRED < 6 && r.width * r.height > 120000) {
+          el.style.setProperty('backdrop-filter', 'blur(16px) saturate(150%) brightness(1.03)', 'important');
+          el.style.setProperty('-webkit-backdrop-filter', 'blur(16px) saturate(150%) brightness(1.03)', 'important');
+          BLURRED++;
+        }
         el.__kdkit_glass = 1; DONE++;
       }
     }
     glassify();
-    setTimeout(glassify, 600); setTimeout(glassify, 1600); setTimeout(glassify, 3200);
+    setTimeout(glassify, 900); setTimeout(glassify, 2400);
   })();
 """
 

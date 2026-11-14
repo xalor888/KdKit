@@ -156,6 +156,10 @@ def main(argv):
         if dismiss_system_dialogs(a.adb, texts):
             time.sleep(2)
             texts = dump(a.adb)
+        # 相机页/WebView 首帧常常慢一拍：判红之前再等一次，避免偶发误报
+        if len(texts) < need:
+            time.sleep(6)
+            texts = dump(a.adb)
         n = len(texts)
         ok = n >= need
         if a.shot_dir:
