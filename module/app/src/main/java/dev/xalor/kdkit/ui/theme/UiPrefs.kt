@@ -21,6 +21,7 @@ object UiPrefs {
     private const val NAME = "kdkit_ui"
     private const val KEY_THEME = "theme"
     private const val KEY_GLASS = "glass"
+    private const val KEY_OOBE = "oobe_done"
 
     private fun prefs(ctx: Context) = ctx.getSharedPreferences(NAME, Context.MODE_PRIVATE)
 
@@ -35,6 +36,13 @@ object UiPrefs {
 
     fun setGlass(ctx: Context, on: Boolean) {
         prefs(ctx).edit().putString(KEY_GLASS, if (on) GLASS_ON else GLASS_OFF).apply()
+    }
+
+    /** 首次启动引导是否已完成（OOBE 只在 false 时显示）。 */
+    fun oobeDone(ctx: Context): Boolean = prefs(ctx).getBoolean(KEY_OOBE, false)
+
+    fun setOobeDone(ctx: Context, done: Boolean) {
+        prefs(ctx).edit().putBoolean(KEY_OOBE, done).apply()
     }
 
     /** 主题下一档（auto → light → dark → auto），给顶栏那个按钮用。 */
