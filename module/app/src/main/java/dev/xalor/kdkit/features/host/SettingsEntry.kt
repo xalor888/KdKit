@@ -150,6 +150,7 @@ object SettingsEntry : SwitchFeature(
     private fun script(): String = """
         (function () {
           if (window.__kdkit_settings_entry) { return; }
+          window.__kdkit_settings_entry = 1;
           var ROW_ID = 'kdkit-settings-row';
           var LABEL = '$ROW_LABEL';
           var MARKS = ['第三方信息共享清单', '个人信息收集清单', '撤回同意隐私政策',
@@ -161,52 +162,66 @@ object SettingsEntry : SwitchFeature(
             for (var i = 0; i < MARKS.length; i++) { if (txt.indexOf(MARKS[i]) >= 0) { hits++; } }
             return hits >= 2;
           }
-          /**
-           * 固定在右下角的胶囊按钮 —— 不再 clone 列表行。
-           *
-           * 为什么改（2026-11-14 真机）：clone 出来的行会被 Vue 的 diff 重建冲掉，
-           * 有时在、有时不在，点击热区也随列表滚动变化（同一个坐标两次点击落到不同行）。
-           * 挂在 body 上、position:fixed 的按钮不受页面重渲染影响，点击面积也固定。
-           */
+          function leafByText(t) {
+            var all = document.getElementsByTagName('*');
+            for (var i = 0; i < all.length; i++) {
+              var el = all[i];
+              if (el.children.length > 2) { continue; }
+              if (norm(el.textContent) === t) { return el; }
+            }
+            return null;
+          }
+          /** 复制相邻设置行（同一套 class / 内边距 / 右侧箭头），只把文字换掉。 */
           function insert() {
             if (document.getElementById(ROW_ID)) { return true; }
             if (!isSettingsPage()) { return false; }
-            var btn = document.createElement('div');
-            btn.id = ROW_ID;
-            btn.textContent = LABEL;
-            btn.style.cssText = [
-              'position:fixed', 'right:16px', 'bottom:104px', 'z-index:2147483000',
-              'padding:12px 18px', 'border-radius:22px', 'color:#fff',
-              'background:linear-gradient(135deg,#5B6BC0,#7C6BE0)',
-              'box-shadow:0 8px 22px rgba(20,24,40,.28)', 'font:500 14px/1.2 sans-serif',
-              'letter-spacing:.02em', 'cursor:pointer', 'user-select:none',
-              'backdrop-filter:blur(10px)', '-webkit-backdrop-filter:blur(10px)'
-            ].join(';');
-            btn.addEventListener('click', function (e) {
-              e.preventDefault();
-              e.stopPropagation();
+            var anchor = null;
+            for (var i = 0; i < MARKS.length && !anchor; i++) { anchor = leafByText(MARKS[i]); }
+            if (!anchor) { return false; }
+            var row = anchor;
+            while (row.parentNode && norm(row.parentNode.textContent) === norm(anchor.textContent)) {
+              row = row.parentNode;
+            }
+            var mine = row.cloneNode(true);
+            mine.id = ROW_ID;
+            mine.style.cursor = 'pointer';
+            var nodes = [];
+            var walker = document.createTreeWalker(mine, NodeFilter.SHOW_TEXT, null, false);
+            while (walker.nextNode()) { nodes.push(walker.currentNode); }
+            var replaced = false;
+            for (var i = 0; i < nodes.length; i++) {
+              if (norm(nodes[i].nodeValue) === norm(anchor.textContent)) {
+                nodes[i].nodeValue = LABEL; replaced = true; break;
+              }
+            }
+            if (!replaced) { mine.insertBefore(document.createTextNode(LABEL), mine.firstChild); }
+            // Vue 会重建 DOM，所以用 pointerdown + click 双绑（capture 阶段，先于框架处理）
+            var go = function (e) {
+              e.preventDefault(); e.stopPropagation();
               location.href = '$SCHEME';
-            }, true);
-            (document.body || document.documentElement).appendChild(btn);
-            console.log('[KdKit] settings-entry button inserted');
+            };
+            mine.addEventListener('pointerdown', go, true);
+            mine.addEventListener('click', go, true);
+            if (row.parentNode) { row.parentNode.insertBefore(mine, row.nextSibling); }
             return true;
           }
-          var tries = 0;
-          function tick() {
-            tries++;
-            insert();
-            if (tries < 40) { setTimeout(tick, 700); }
-          }
-          function start() {
-            if (window.__kdkit_settings_entry) { return; }
+          /**
+           * 常驻重插（2026-11-14）：以前用 30 次定时器，Vue 一旦 diff 重建行就永久消失。
+           * 现在挂 MutationObserver：行不在了就补回来，且只在设置页里动作。
+           */
+          function keep() {
             if (!isSettingsPage()) { return; }
-            window.__kdkit_settings_entry = true;
-            console.log('[KdKit] settings-entry: settings page detected');
-            tick();
+            insert();
           }
-          setTimeout(start, 400);
-          setTimeout(start, 1500);
-          setTimeout(start, 4000);
+          var t = 0;
+          function boot() { keep(); if (t++ < 20) { setTimeout(boot, 400); } }
+          boot();
+          try {
+            new MutationObserver(function () { keep(); })
+              .observe(document.documentElement, { childList: true, subtree: true });
+          } catch (e) {}
+          setTimeout(keep, 1200);
+          setTimeout(keep, 3000);
         })();
     """.trimIndent()
 }

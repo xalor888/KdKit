@@ -244,8 +244,8 @@ object Md3Skin : SwitchFeature(
             if (glass) {
                 append("    [class*=\"card\"],[class*=\"Card\"],[class*=\"panel\"],[class*=\"Panel\"],")
                 append("[class*=\"item\"],[class*=\"Item\"]{background:").append(glassFill).append("!important;")
-                append("backdrop-filter:blur(16px) saturate(1.25)!important;")
-                append("-webkit-backdrop-filter:blur(16px) saturate(1.25)!important;")
+                append("border-radius:20px!important;")
+                append("box-shadow:inset 0 1px 0 ").append(glassBorder).append("!important;")
                 append("border:1px solid ").append(glassBorder).append("!important;")
                 append("box-shadow:").append(glassShadow).append("!important;}\n")
             }
@@ -254,10 +254,58 @@ object Md3Skin : SwitchFeature(
             append(if (full) "full" else "light").append("');\n")
             if (dark) append(DARK_INVERT_CSS)
             if (full && !dark) append(NORMALISE_JS)
+            if (glass) append(GLASSIFY_JS)
             append(REVERT_IF_BLANK_JS)
             append("})();\n")
         }
     }
+
+    /**
+     * 玻璃化：把页面上"亮色大块"（面积 ≥ 2 万 px²、亮度 > 232）当场换成玻璃卡 ——
+     * 半透明填充 + 1px 高光描边 + 顶部内高光 + 柔和外阴影 + 20px 圆角。
+     *
+     * 为什么用 JS 而不是纯 CSS 选择器：快对的 H5 类名是构建期哈希，`[class*="card"]`
+     * 命中不了几张卡；只有按"面积 + 颜色的统计特征"扫才通用。
+     * 不用 `backdrop-filter`：WebView 上它会让整页白屏（真机踩过），玻璃感靠叠色与描边表达。
+     */
+    private const val GLASSIFY_JS = """
+  (function(){
+    var DARK = document.documentElement.getAttribute('data-kdkit-dark') === '1';
+    var FILL = DARK ? 'rgba(30,33,44,.72)' : 'rgba(255,255,255,.72)';
+    var EDGE = DARK ? 'rgba(255,255,255,.14)' : 'rgba(255,255,255,.72)';
+    var SHADOW = DARK ? '0 10px 24px rgba(0,0,0,.45)' : '0 10px 24px rgba(31,36,58,.10)';
+    var DONE = 0;
+    function rgba(cs){
+      var m = /rgba?\(([0-9]+), ?([0-9]+), ?([0-9]+)(?:, ?([0-9.]+))?/.exec(cs.backgroundColor);
+      return m ? [+m[1], +m[2], +m[3], m[4] === undefined ? 1 : +m[4]] : null;
+    }
+    function glassify(){
+      var els = document.querySelectorAll('div, section, li');
+      for (var i = 0; i < els.length && DONE < 260; i++) {
+        var el = els[i];
+        if (el.__kdkit_glass) continue;
+        var r = el.getBoundingClientRect();
+        if (r.width * r.height < 20000) continue;
+        var txt = (el.innerText || '').trim();
+        if (txt.length > 400) continue;
+        var cs = getComputedStyle(el);
+        var c = rgba(cs);
+        if (!c) continue;
+        var lum = (c[0]*299 + c[1]*587 + c[2]*114) / 1000;
+        var isLight = lum > 232 && c[3] > 0.5;
+        var isDarkCard = DARK && lum < 70;
+        if (!isLight && !isDarkCard) continue;
+        el.style.setProperty('background', FILL, 'important');
+        el.style.setProperty('border', '1px solid ' + EDGE, 'important');
+        el.style.setProperty('border-radius', '20px', 'important');
+        el.style.setProperty('box-shadow', 'inset 0 1px 0 ' + EDGE + ', ' + SHADOW, 'important');
+        el.__kdkit_glass = 1; DONE++;
+      }
+    }
+    glassify();
+    setTimeout(glassify, 600); setTimeout(glassify, 1600); setTimeout(glassify, 3200);
+  })();
+"""
 
     /**
      * 白屏自愈：注入后 1.2s / 3s 各查一次，若页面被我们弄空了（没有可见文字、也没有图片/画布），
