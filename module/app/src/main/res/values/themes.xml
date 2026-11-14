@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.KdKit" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@android:color/background_light</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">true</item>
+        <!-- 关键：HyperOS / Android 深色模式下会把浅色主题强制压暗（force dark），
+             结果是"窗口背景黑 + 我们的深色文字" = 看起来整页黑屏。 -->
+        <item name="android:forceDarkAllowed">false</item>
     </style>
 </resources>

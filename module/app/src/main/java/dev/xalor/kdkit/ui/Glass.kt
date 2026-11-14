@@ -1,22 +1,29 @@
 package dev.xalor.kdkit.ui
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.xalor.kdkit.ui.theme.LocalGlass
@@ -37,43 +44,92 @@ fun GlassBackground(
     val g = LocalGlass.current
     val bottom = if (g.isDark) Color(0xFF04050A) else Color(0xFFD8DDF0)
 
-    Box(modifier.fillMaxSize()) {
-        Canvas(Modifier.fillMaxSize()) {
-            drawRect(
-                brush = Brush.verticalGradient(0f to g.bgTop, 0.6f to g.bgBottom, 1f to bottom),
+    BoxWithConstraints(modifier.fillMaxSize()) {
+        val wPx = constraints.maxWidth
+        val hPx = constraints.maxHeight
+        // 关键（2026-11-14 真机 ANR）：背景**预渲染成一张位图**，只在尺寸/主题变化时生成一次。
+        // 之前是每帧在 Compose Canvas 里画两个大半径 radialGradient 圆（半径约 1000px，
+        // 在 2K 屏 + 520dpi 上填充率爆炸），ANR trace 直接指向 Glass.kt 的 drawCircle。
+        val bitmap = remember(wPx, hPx, g.isDark) {
+            renderBackdrop(wPx, hPx, g, bottom)
+        }
+        if (bitmap != null) {
+            Image(
+                bitmap = bitmap,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.FillBounds,
             )
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(g.bgBlob1, Color.Transparent),
-                    center = Offset(size.width * 0.16f, size.height * 0.10f),
-                    radius = size.minDimension * 0.8f,
-                ),
-                radius = size.minDimension * 0.8f,
-                center = Offset(size.width * 0.16f, size.height * 0.10f),
-            )
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(g.bgBlob2, Color.Transparent),
-                    center = Offset(size.width * 0.88f, size.height * 0.58f),
-                    radius = size.minDimension * 0.75f,
-                ),
-                radius = size.minDimension * 0.75f,
-                center = Offset(size.width * 0.88f, size.height * 0.58f),
-            )
-            // 细噪点：给模糊层提供高频细节
-            val dot = if (g.isDark) Color(0x14FFFFFF) else Color(0x12000000)
-            var y = 0f
-            while (y < size.height) {
-                var x = (y * 0.7f) % 6f
-                while (x < size.width) {
-                    drawCircle(dot, radius = 0.9f, center = Offset(x, y))
-                    x += 6f
-                }
-                y += 6f
-            }
         }
         content()
     }
+}
+
+/** 卡片内的彩色晕染，同样预渲染（半分辨率）。 */
+private fun renderCard(wPx: Int, hPx: Int, g: dev.xalor.kdkit.ui.theme.GlassColors): ImageBitmap? {
+    if (wPx <= 0 || hPx <= 0) return null
+    val w = (wPx * 0.5f).toInt().coerceAtLeast(1)
+    val h = (hPx * 0.5f).toInt().coerceAtLeast(1)
+    val bmp = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(bmp)
+    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+    paint.shader = android.graphics.LinearGradient(
+        0f, 0f, w.toFloat(), h.toFloat(),
+        intArrayOf(g.cardFillTop.toArgb(), g.cardFillBottom.toArgb()),
+        floatArrayOf(0f, 1f),
+        android.graphics.Shader.TileMode.CLAMP,
+    )
+    canvas.drawRect(0f, 0f, w.toFloat(), h.toFloat(), paint)
+    val maxDim = maxOf(w, h).toFloat()
+    fun tint(cx: Float, cy: Float, color: Color) {
+        paint.shader = android.graphics.RadialGradient(
+            cx, cy, maxDim * 0.9f,
+            intArrayOf(color.toArgb(), android.graphics.Color.TRANSPARENT),
+            floatArrayOf(0f, 1f), android.graphics.Shader.TileMode.CLAMP,
+        )
+        canvas.drawCircle(cx, cy, maxDim * 0.9f, paint)
+    }
+    tint(w * 0.12f, 0f, g.cardTint1)
+    tint(w * 0.95f, h.toFloat(), g.cardTint2)
+    paint.shader = null
+    return bmp.asImageBitmap()
+}
+
+/** 用系统 Canvas/Paint 生成背景位图（半分辨率即可：渐变与光斑本来就是柔和的）。 */
+private fun renderBackdrop(wPx: Int, hPx: Int, g: dev.xalor.kdkit.ui.theme.GlassColors, bottom: Color): ImageBitmap? {
+    if (wPx <= 0 || hPx <= 0) return null
+    val scale = 0.5f
+    val w = (wPx * scale).toInt().coerceAtLeast(1)
+    val h = (hPx * scale).toInt().coerceAtLeast(1)
+    val bmp = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(bmp)
+    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+
+    // 1) 纵向渐变底
+    paint.shader = android.graphics.LinearGradient(
+        0f, 0f, 0f, h.toFloat(),
+        intArrayOf(g.bgTop.toArgb(), g.bgBottom.toArgb(), bottom.toArgb()),
+        floatArrayOf(0f, 0.6f, 1f),
+        android.graphics.Shader.TileMode.CLAMP,
+    )
+    canvas.drawRect(0f, 0f, w.toFloat(), h.toFloat(), paint)
+
+    // 2) 两块柔光（预渲染，只画一次）
+    fun blob(cx: Float, cy: Float, r: Float, color: Color) {
+        paint.shader = android.graphics.RadialGradient(
+            cx, cy, r,
+            intArrayOf(color.toArgb(), android.graphics.Color.TRANSPARENT),
+            floatArrayOf(0f, 1f),
+            android.graphics.Shader.TileMode.CLAMP,
+        )
+        canvas.drawCircle(cx, cy, r, paint)
+    }
+    val minDim = minOf(w, h).toFloat()
+    blob(w * 0.16f, h * 0.10f, minDim * 0.8f, g.bgBlob1)
+    blob(w * 0.88f, h * 0.58f, minDim * 0.75f, g.bgBlob2)
+
+    paint.shader = null
+    return bmp.asImageBitmap()
 }
 
 /**
@@ -111,27 +167,15 @@ fun GlassCard(
         if (glassOff) {
             Box(Modifier.matchParentSize().background(opaqueCardColor()))
         } else {
-            // 1) 彩色晕染底层（会在下一步被模糊）
-            Canvas(Modifier.matchParentSize()) {
-                drawRect(Brush.verticalGradient(listOf(g.cardFillTop, g.cardFillBottom)))
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(g.cardTint1, Color.Transparent),
-                        center = Offset(size.width * 0.12f, 0f),
-                        radius = size.maxDimension * 0.9f,
-                    ),
-                    radius = size.maxDimension * 0.9f,
-                    center = Offset(size.width * 0.12f, 0f),
-                )
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(g.cardTint2, Color.Transparent),
-                        center = Offset(size.width * 0.95f, size.height),
-                        radius = size.maxDimension * 0.85f,
-                    ),
-                    radius = size.maxDimension * 0.85f,
-                    center = Offset(size.width * 0.95f, size.height),
-                )
+            // 卡片的彩色晕染同样**预渲染一次**（不再每帧画两个大半径 radialGradient）
+            BoxWithConstraints(Modifier.matchParentSize()) {
+                val wPx = constraints.maxWidth
+                val hPx = constraints.maxHeight
+                val bmp = remember(wPx, hPx, g.isDark) { renderCard(wPx, hPx, g) }
+                if (bmp != null) {
+                    Image(bitmap = bmp, contentDescription = null, modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.FillBounds)
+                }
             }
             // 3) 高光边
             Box(
