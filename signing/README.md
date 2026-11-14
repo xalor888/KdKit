@@ -127,3 +127,20 @@ Secrets 清单（已用 `gh secret set` 写入仓库）：
 | `KEY_PASSWORD` | key 口令（与 keystore 口令相同） |
 
 `ci.yml` 保持原样：push/PR 只跑单测 + `assembleDebug`，不碰签名材料。
+
+## 6. 首次 tag 发布验证（v1.2.1）
+
+- 工作流运行：Release #43559855685（tag `v1.2.1`，commit `e06ca04`），结论 **success**，步骤 `Restore release keystore` → `Build release APK (release signing)` → `Verify release signature` → `Publish release` 全绿。
+- Release：<https://github.com/xalor888/KdKit/releases/tag/v1.2.1>
+- 附件：`KdKit-v1.2.1.apk`（10,792,543 B）+ `KdKit-v1.2.1.apk.sha256`
+- 下载后复验（本机 apksigner 36.0.0）：
+
+```
+$ shasum -a 256 -c KdKit-v1.2.1.apk.sha256
+KdKit-v1.2.1.apk: OK
+$ apksigner verify --print-certs KdKit-v1.2.1.apk
+Signer #1 certificate DN: CN=KdKit, O=xalor, C=CN
+Signer #1 certificate SHA-256 digest: 31fcbb1b32e019954b8d80f5837d64b8c15f1f78eaeba3400970c5092050cf37
+```
+
+即 tag 发布包与本地 `assembleRelease` 产物使用同一把发布证书；`cn=KdKit` 断言让它不可能悄悄退回 debug 签名。
