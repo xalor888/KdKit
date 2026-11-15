@@ -50,11 +50,14 @@ fun Modifier.liquidGlassSurface(
             color = if (light) Color(0xFAF4F4F6) else Color(0xFA1C1C1E),
             cornerRadius = r,
         )
-        // ② 上半高光（玻璃的 specular）
+        // ② 上半高光：用**内嵌实色圆角矩形**模拟，不用 Brush
+        //    （真机上任何渐变 Brush 都会让小米 libhwui 在 MiBackgroundBlurBlend 崩，
+        //     例如 2026-11-15 10:51 那次；纯色多层是唯一稳的路子）
+        val inset = 1.dp.toPx()
         drawRoundRect(
-            color = if (light) Color(0x18FFFFFF) else Color(0x14FFFFFF),
-            topLeft = Offset(0f, 0f),
-            size = Size(size.width, size.height * 0.5f),
+            color = if (light) Color(0x1FFFFFFF) else Color(0x1AFFFFFF),
+            topLeft = Offset(inset, inset),
+            size = Size(size.width - inset * 2, size.height * 0.46f),
             cornerRadius = r,
         )
         // ③ 下缘压暗

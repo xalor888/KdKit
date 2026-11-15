@@ -45,7 +45,8 @@ import dev.xalor.kdkit.HostVersion
 import dev.xalor.kdkit.ui.theme.UiPrefs
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.SmallTitle
-import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 private enum class Step(val title: String, val caption: String) {
@@ -166,13 +167,7 @@ fun OobeFlow(onDone: () -> Unit) {
         }
 
         Column(Modifier.navigationBarsPadding().padding(horizontal = 20.dp, vertical = 10.dp)) {
-            TextButton(
-                text = when (step) {
-                    Step.Welcome -> "开始"
-                    Step.Check -> "我已在框架里启用，继续"
-                    Step.Notice -> "继续"
-                    Step.Done -> "进入设置"
-                },
+            Button(
                 onClick = {
                     when (step) {
                         Step.Welcome -> go(Step.Check)
@@ -182,8 +177,19 @@ fun OobeFlow(onDone: () -> Unit) {
                     }
                 },
                 enabled = step != Step.Notice || agreed,
+                colors = ButtonDefaults.buttonColorsPrimary(),
                 modifier = Modifier.fillMaxWidth(),
-            )
+            ) {
+                Text(
+                    when (step) {
+                        Step.Welcome -> "开始"
+                        Step.Check -> "我已在框架里启用，继续"
+                        Step.Notice -> "继续"
+                        Step.Done -> "进入设置"
+                    },
+                    fontSize = 16.sp,
+                )
+            }
             if (step == Step.Check) {
                 Text(
                     "先跳过检查", fontSize = 13.sp, color = c.onSurfaceVariantSummary,

@@ -35,7 +35,7 @@ private sealed interface Ui {
 
 /** 关于 + 更新（Miuix）：更新检查是页面里的一行，不弹窗。 */
 @Composable
-fun AboutPage(onBack: () -> Unit) {
+fun AboutPage(onBack: () -> Unit, onReplayOobe: () -> Unit = {}) {
     val c = MiuixTheme.colorScheme
     val ctx = LocalContext.current
     val selfVer = remember {
@@ -86,6 +86,15 @@ fun AboutPage(onBack: () -> Unit) {
                     if (state is Ui.Newer) UpdateApi.openReleases(ctx)
                     else if (state !is Ui.Checking) reload++
                 },
+            )
+        }
+
+        SmallTitle("引导")
+        Card(Modifier.padding(horizontal = 12.dp)) {
+            ArrowPreference(
+                title = "重看引导",
+                summary = "重新走一遍首次启动的四步说明",
+                onClick = onReplayOobe,
             )
         }
 

@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -46,6 +47,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastCoerceIn
 import androidx.compose.ui.util.lerp
@@ -89,7 +91,9 @@ fun LiquidBottomTabs(
     onTabLongClickLabel: ((Int) -> String?)? = null,
     content: @Composable (index: Int, selected: Boolean, overlayPass: Boolean) -> Unit,
 ) {
-    val isLightTheme = MaterialTheme.colorScheme.background.luminance() > 0.5f
+    // 用我们的主题标记判断深浅：MiuixTheme 不改 MaterialTheme.colorScheme，
+    // 靠 luminance() 会永远判成浅色（深色模式下底栏还是白的）。
+    val isLightTheme = !dev.xalor.kdkit.ui.theme.LocalKdDark.current
     val containerColor = if (isLightTheme) {
         Color(0xFFFAFAFA).copy(alpha = 0.6f)
     } else {
@@ -151,12 +155,9 @@ fun LiquidBottomTabs(
         // ① 本体：玻璃材质 + 按压时整体放大
         Row(
             Modifier
-                .graphicsLayer {
-                    translationX = panelOffset
-                    val scale = lerp(1f, 1f + 16.dp.toPx() / size.width, dragAnimation.pressProgress)
-                    scaleX = scale
-                    scaleY = scale
-                }
+                // 用 offset 而不是 graphicsLayer：translationX 会为整条栏建一个 RenderNode 图层，
+                // 与渐变叠在一起会踩到小米 libhwui 的崩溃点。offset 只改布局位置，不建图层。
+                .offset { IntOffset(panelOffset.roundToInt(), 0) }
                 .liquidGlassSurface(Capsule(), isLightTheme)
                 .height(64.dp)
                 .fillMaxWidth()

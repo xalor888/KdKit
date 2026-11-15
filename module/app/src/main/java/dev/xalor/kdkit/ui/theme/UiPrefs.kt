@@ -22,6 +22,13 @@ object UiPrefs {
     private const val KEY_THEME = "theme"
     private const val KEY_GLASS = "glass"
     private const val KEY_OOBE = "oobe_done"
+    private const val KEY_OOBE_VER = "oobe_version"
+
+    /**
+     * 引导的版本号。**改了引导内容就把这个数字 +1** —— 已装用户升级后会再看一次。
+     * 只存"完成到第几版"，所以从 1 升到 2 时老用户（存着 1）也会重新触发。
+     */
+    const val OOBE_VERSION = 2
 
     private fun prefs(ctx: Context) = ctx.getSharedPreferences(NAME, Context.MODE_PRIVATE)
 
@@ -75,9 +82,20 @@ object UiPrefs {
     }
 
     /** 首次启动引导是否已完成（OOBE 只在 false 时显示）。 */
-    fun oobeDone(ctx: Context): Boolean = prefs(ctx).getBoolean(KEY_OOBE, false)
+    /** 引导是否已看到当前版本。 */
+    fun oobeDone(ctx: Context): Boolean =
+        prefs(ctx).getInt(KEY_OOBE_VER, 0) >= OOBE_VERSION
+
+    /** 手动"重看引导"（关于页里那个入口）。 */
+    fun resetOobe(ctx: Context) {
+        prefs(ctx).edit().putInt(KEY_OOBE_VER, 0).apply()
+    }
 
     fun setOobeDone(ctx: Context, done: Boolean) {
+        if (done) {
+            prefs(ctx).edit().putInt(KEY_OOBE_VER, OOBE_VERSION).apply()
+            return
+        }
         prefs(ctx).edit().putBoolean(KEY_OOBE, done).apply()
     }
 
