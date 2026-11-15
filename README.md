@@ -22,7 +22,7 @@ LSPosed / Vector 模块，40 个可热切换的功能，Material 3 设置页（�
 
 ## 安装
 
-**方式一：LSPosed 模块仓库（推荐）**
+**方式一：自建仓库（无需审核，立即可用）**
 
 在 LSPosed / Vector 的「模块仓库」里添加：
 
@@ -30,7 +30,10 @@ LSPosed / Vector 模块，40 个可热切换的功能，Material 3 设置页（�
 https://xalor888.github.io/KdKit/repo.json
 ```
 
-之后就能在框架里直接看到版本、更新与作用域，一键安装。
+之后就能在框架里直接看到版本与更新。这是**自建仓库**，不需要审核。
+
+> 官方模块库（`modules.lsposed.org`，管理器默认列表里能搜到的那个）**需要审核**，
+> 提交方式见 [`docs/lsposed-submission.md`](docs/lsposed-submission.md)。
 
 **方式二：手动装 APK**
 

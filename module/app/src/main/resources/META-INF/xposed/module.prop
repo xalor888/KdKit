@@ -1,7 +1,0 @@
-# LSPosed 模块元数据（新版 LSPosed / Vector 读这份，旧版 Xposed 读 assets/xposed_init）
-minVersion=93
-targetApi=37
-minApi=26
-staticScope=true
-autoHotReload=true
-description=快对去广告 / 界面 / 稳定性增强：去掉开屏、横幅、页签、弹窗、信息流与会员推销，统一 Material 3 界面
