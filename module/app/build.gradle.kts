@@ -98,9 +98,6 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
 
-    implementation("io.github.neoruaa.glasmio:glasmio-ui:0.1.3")
-    implementation("io.github.neoruaa.glasmio:glasmio-preference:0.1.3")
-    implementation("io.github.neoruaa.glasmio:glasmio-icons:0.1.3")
 
     implementation("androidx.activity:activity-compose:1.13.0")
     implementation("androidx.core:core-ktx:1.13.1")

@@ -296,7 +296,14 @@ object Md3Skin : SwitchFeature(
       var m = /rgba?\(([0-9]+), ?([0-9]+), ?([0-9]+)(?:, ?([0-9.]+))?/.exec(cs.backgroundColor);
       return m ? [+m[1], +m[2], +m[3], m[4] === undefined ? 1 : +m[4]] : null;
     }
+    var SKIP = /photo|camera|answer|solve|question|detail|record|scan/i;
+    function glassAllowed(){
+      var u = location.href || '';
+      if (SKIP.test(u)) { return false; }   // 拍题/答题/详情页一律不碰 DOM 样式
+      return true;
+    }
     function glassify(){
+      if (!glassAllowed()) { return; }
       var els = document.querySelectorAll('div, section, li');
       // 硬预算（2026-11-14 事故）：这里以前对**每一个** div/section/li 都调用
       // getBoundingClientRect + innerText + getComputedStyle，三个都是强制布局的操作。
@@ -329,12 +336,8 @@ object Md3Skin : SwitchFeature(
         el.style.setProperty('box-shadow',
           'inset 0 1.5px 0 ' + EDGE + ', inset 0 -1px 0 ' +
           (DARK ? 'rgba(255,255,255,.10)' : 'rgba(255,255,255,.45)') + ', ' + SHADOW, 'important');
-        // 真模糊只给最大的 4 块：大面积 backdrop-filter 会把渲染线程压到 ANR。
-        if (BLURRED < 4 && r.width * r.height > 150000) {
-          el.style.setProperty('backdrop-filter', 'blur(16px) saturate(150%) brightness(1.03)', 'important');
-          el.style.setProperty('-webkit-backdrop-filter', 'blur(16px) saturate(150%) brightness(1.03)', 'important');
-          BLURRED++;
-        }
+        // 不设 backdrop-filter：WebView 上大面积模糊会把合成线程压死，表现为"整页卡住"。
+        // 玻璃感只用渐变 + 描边 + 内阴影表达（与 279 行那条注释一致）。
         el.__kdkit_glass = 1; DONE++;
       }
     }

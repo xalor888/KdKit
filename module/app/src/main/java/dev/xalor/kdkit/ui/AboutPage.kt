@@ -1,8 +1,6 @@
 package dev.xalor.kdkit.ui
 
-import android.content.Context
-import android.content.Intent
-import android.net.Uri
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,9 +10,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
@@ -26,179 +24,122 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import io.github.neoruaa.glasmio.core.GlasmioTheme
-import io.github.neoruaa.glasmio.core.IosTypography
-import io.github.neoruaa.glasmio.glass.GlasmioBackdropHost
-import io.github.neoruaa.glasmio.icons.SfIcon
-import io.github.neoruaa.glasmio.ui.GlasmioGroupedList
-import io.github.neoruaa.glasmio.ui.GlasmioListRow
-import io.github.neoruaa.glasmio.ui.GlasmioSectionTitle
+import androidx.compose.ui.unit.sp
+import dev.xalor.kdkit.ui.theme.IosColors
+import dev.xalor.kdkit.ui.theme.LocalIos
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-private const val REPO_OWNER = "xalor888"
-private const val REPO_NAME = "KdKit"
-private const val REPO_URL = "https://github.com/$REPO_OWNER/$REPO_NAME"
-private const val RELEASES_URL = "$REPO_URL/releases"
-private const val API_LATEST = "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/releases/latest"
-
-private sealed interface UpdateUi {
-    data object Checking : UpdateUi
-    data object Latest : UpdateUi
-    data class Newer(val tag: String) : UpdateUi
-    data class Failed(val why: String) : UpdateUi
+private sealed interface Ui {
+    data object Checking : Ui
+    data object Latest : Ui
+    data class Newer(val tag: String) : Ui
+    data class Failed(val why: String) : Ui
 }
 
-/** 关于 + 更新：一整页，不是弹窗。 */
+/** 关于 + 更新：整页，不弹窗。 */
 @Composable
-fun AboutPage(onBack: () -> Unit, glass: Boolean) {
-    if (!glass) {
-        Box(Modifier.fillMaxSize()) { AboutBody(onBack) }
-        return
-    }
-    GlasmioBackdropHost(modifier = Modifier.fillMaxSize(), sampledContent = { }) { AboutBody(onBack) }
-}
-
-@Composable
-private fun AboutBody(onBack: () -> Unit) {
+fun AboutPage(onBack: () -> Unit) {
+    val ios = LocalIos.current
     val ctx = LocalContext.current
-    val colors = GlasmioTheme.colors
     val selfVer = remember {
         runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName ?: "?" }
             .getOrDefault("?")
     }
-    var state by remember { mutableStateOf<UpdateUi>(UpdateUi.Checking) }
+    var state by remember { mutableStateOf<Ui>(Ui.Checking) }
     var checking by remember { mutableStateOf(true) }
     var reload by remember { mutableStateOf(0) }
 
     LaunchedEffect(reload) {
-        checking = true
-        state = UpdateUi.Checking
-        val tag = withContext(Dispatchers.IO) { fetchLatestTag() }
+        checking = true; state = Ui.Checking
+        val tag = withContext(Dispatchers.IO) { UpdateApi.fetchLatestTag() }
         state = when {
-            tag == null -> UpdateUi.Failed("连不上 GitHub，稍后再试")
-            semverGreater(tag, selfVer) -> UpdateUi.Newer(tag)
-            else -> UpdateUi.Latest
+            tag == null -> Ui.Failed("连不上 GitHub，点这里重试")
+            UpdateApi.isNewer(tag, selfVer) -> Ui.Newer(tag)
+            else -> Ui.Latest
         }
         checking = false
     }
 
-    Column(
-        Modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp),
-    ) {
-        Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(38.dp).clickable(onClick = onBack),
-                contentAlignment = Alignment.Center) {
-                SfIcon("chevron.backward", "返回", Modifier.size(20.dp), colors.accent)
-            }
-            Spacer(Modifier.padding(horizontal = 3.dp))
-            Text("关于", style = IosTypography.title3, fontWeight = FontWeight(600), color = colors.content)
+    Column(Modifier.fillMaxSize().background(ios.groupedBg).statusBarsPadding()
+        .verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
+        Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("← 关于", fontSize = 16.sp, color = ios.accent,
+                modifier = Modifier.clickable(onClick = onBack).padding(vertical = 6.dp))
         }
-        Text("KdKit", style = IosTypography.largeTitle, fontWeight = FontWeight.Bold,
-            color = colors.content, modifier = Modifier.padding(top = 10.dp))
-        Text("版本 $selfVer · MIT License · 作者 xalor", style = IosTypography.subheadline,
-            color = colors.secondaryContent)
+        Text("KdKit", fontSize = 34.sp, fontWeight = FontWeight.Bold, color = ios.content,
+            modifier = Modifier.padding(top = 6.dp))
+        Text("版本 $selfVer · MIT · 作者 xalor", fontSize = 13.sp, color = ios.secondary)
 
-        Spacer(Modifier.height(18.dp))
-        GlasmioSectionTitle("更新")
-        GlasmioGroupedList {
-            GlasmioListRow(
-                title = when (val s = state) {
-                    UpdateUi.Checking -> "正在检查更新…"
-                    UpdateUi.Latest -> "已是最新版本"
-                    is UpdateUi.Newer -> "有新版本 ${s.tag}"
-                    is UpdateUi.Failed -> "检查失败：${s.why}"
-                },
-                subtitle = "当前 $selfVer · 远端读取 GitHub Releases",
-                showTopSeparator = false,
-                leading = {
-                    if (checking) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                    else SfIcon(if (state is UpdateUi.Newer) "arrow.down" else "checkmark", null,
-                        Modifier.size(20.dp),
-                        if (state is UpdateUi.Newer) colors.accent else colors.secondaryContent)
-                },
-                onClick = {
-                    if (state is UpdateUi.Newer) openUrl(ctx, RELEASES_URL) else reload++
-                },
-            )
-            if (state is UpdateUi.Newer) {
-                GlasmioListRow(title = "打开发布页下载", systemName = "safari",
-                    onClick = { openUrl(ctx, RELEASES_URL) })
+        SectionTitle("更新", ios)
+        Card(ios) {
+            Row(Modifier.fillMaxWidth().clickable {
+                if (state is Ui.Newer) UpdateApi.openReleases(ctx)
+                else if (state !is Ui.Checking) reload++
+            }.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (checking) CircularProgressIndicator(Modifier.height(18.dp).padding(end = 10.dp),
+                    strokeWidth = 2.dp)
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        when (val s = state) {
+                            Ui.Checking -> "正在检查更新…"
+                            Ui.Latest -> "已是最新版本"
+                            is Ui.Newer -> "有新版本 ${s.tag}"
+                            is Ui.Failed -> "检查失败：${s.why}"
+                        },
+                        fontSize = 16.sp, color = ios.content,
+                    )
+                    Text("当前 $selfVer · 远端读取 GitHub Releases", fontSize = 12.sp, color = ios.secondary)
+                }
             }
         }
 
-        Spacer(Modifier.height(18.dp))
-        GlasmioSectionTitle("项目")
-        GlasmioGroupedList {
-            GlasmioListRow(title = "项目主页", subtitle = REPO_URL, systemName = "safari",
-                showTopSeparator = false, onClick = { openUrl(ctx, REPO_URL) })
-            GlasmioListRow(title = "全部版本", systemName = "arrow.up.right",
-                onClick = { openUrl(ctx, RELEASES_URL) })
+        SectionTitle("项目", ios)
+        Card(ios) {
+            LinkRow("项目主页", UpdateApi.repoUrl, ios) { UpdateApi.openReleases(ctx) }
+            Box(Modifier.fillMaxWidth().padding(start = 16.dp).height(1.dp).background(ios.separator))
+            LinkRow("全部版本", null, ios) { UpdateApi.openReleases(ctx) }
         }
 
-        Spacer(Modifier.height(18.dp))
-        GlasmioSectionTitle("兼容")
-        GlasmioGroupedList {
-            GlasmioListRow(
-                title = "快对 ${dev.xalor.kdkit.HostVersion.BASELINE_VERSION_NAME}",
-                subtitle = "基线 ${dev.xalor.kdkit.HostVersion.BASELINE_VERSION_CODE}；兼容 7.10.0 / 7.9.0 / 内测 1865",
-                showTopSeparator = false,
-                showDisclosure = false,
-            )
-            GlasmioListRow(title = "模块", subtitle = "Xposed / LSPosed / Vector，需 root", showDisclosure = false)
+        SectionTitle("兼容", ios)
+        Card(ios) {
+            Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+                Column {
+                    Text("快对 ${dev.xalor.kdkit.HostVersion.BASELINE_VERSION_NAME}", fontSize = 16.sp, color = ios.content)
+                    Text("基线 ${dev.xalor.kdkit.HostVersion.BASELINE_VERSION_CODE}；兼容 7.10.0 / 7.9.0 / 1865",
+                        fontSize = 12.sp, color = ios.secondary)
+                }
+            }
         }
-        Spacer(Modifier.height(26.dp))
+        Spacer(Modifier.height(20.dp))
         Text("本模块只修改快对 App 自身的界面与广告加载，不修改服务器数据。",
-            style = IosTypography.footnote, color = colors.tertiaryContent)
-        Spacer(Modifier.height(80.dp))
+            fontSize = 12.sp, color = ios.secondary)
+        Spacer(Modifier.height(40.dp))
     }
 }
 
-/* ── 版本与网络 ── */
-private val TAG_RE = Regex("\"tag_name\"\\s*:\\s*\"([^\"]+)\"")
+@Composable
+private fun SectionTitle(t: String, ios: IosColors) {
+    Text(t, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = ios.secondary,
+        modifier = Modifier.padding(top = 20.dp, bottom = 6.dp))
+}
 
-private fun versionParts(raw: String): List<Int> =
-    raw.trim().removePrefix("v").removePrefix("V").substringBefore('-')
-        .split('.').map { it.toIntOrNull() ?: 0 }
+@Composable
+private fun Card(ios: IosColors, content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(ios.card), content = content)
+}
 
-private fun semverGreater(a: String, b: String): Boolean {
-    val pa = versionParts(a); val pb = versionParts(b)
-    for (i in 0 until maxOf(pa.size, pb.size)) {
-        val x = pa.getOrNull(i) ?: 0; val y = pb.getOrNull(i) ?: 0
-        if (x != y) return x > y
+@Composable
+private fun LinkRow(title: String, subtitle: String?, ios: IosColors, onClick: () -> Unit) {
+    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 14.dp)) {
+        Column(Modifier.weight(1f)) {
+            Text(title, fontSize = 16.sp, color = ios.content)
+            if (subtitle != null) Text(subtitle, fontSize = 12.sp, color = ios.secondary)
+        }
+        Text("›", fontSize = 18.sp, color = ios.tertiary)
     }
-    return false
-}
-
-private fun fetchLatestTag(): String? {
-    runCatching {
-        val conn = (java.net.URL(API_LATEST).openConnection() as java.net.HttpURLConnection).apply {
-            requestMethod = "GET"; connectTimeout = 5000; readTimeout = 5000
-            setRequestProperty("Accept", "application/vnd.github+json")
-            setRequestProperty("User-Agent", "KdKit-Android")
-        }
-        try {
-            if (conn.responseCode in 200..299)
-                TAG_RE.find(conn.inputStream.bufferedReader().use { it.readText() })
-                    ?.groupValues?.get(1) else null
-        } finally { conn.disconnect() }
-    }.getOrNull()?.let { return it }
-    return runCatching {
-        val conn = (java.net.URL("$REPO_URL/releases/latest").openConnection() as java.net.HttpURLConnection).apply {
-            instanceFollowRedirects = false; connectTimeout = 8000; readTimeout = 8000
-            setRequestProperty("User-Agent", "KdKit-Android")
-        }
-        try {
-            val loc = conn.getHeaderField("Location") ?: return@runCatching null
-            loc.trimEnd('/').substringAfterLast('/').takeIf { it.isNotEmpty() }
-        } finally { conn.disconnect() }
-    }.getOrNull()
-}
-
-private fun openUrl(ctx: Context, url: String) {
-    runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
 }

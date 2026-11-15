@@ -74,10 +74,10 @@ class SettingsCopyTest {
 
     @Test
     fun `group counts match the design doc`() {
-        // module/UI.md §3 写的 7 / 5 / 4 / 1 / 1 / 23 —— 两边一起改才算改完
+        // module/UI.md §3 写的 7 / 5 / 5 / 1 / 1 / 23（push_guard 加进省心组） —— 两边一起改才算改完
         assertEquals(7, SettingsCopy.items(Group.ADS).size)
         assertEquals(5, SettingsCopy.items(Group.CONTENT).size)
-        assertEquals(4, SettingsCopy.items(Group.EASE).size)
+        assertEquals(5, SettingsCopy.items(Group.EASE).size)
         assertEquals(1, SettingsCopy.items(Group.PK).size)
         assertEquals(1, SettingsCopy.items(Group.LOOK).size)
         assertEquals(23, SettingsCopy.items(Group.DIAG).size)

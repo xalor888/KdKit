@@ -63,6 +63,7 @@ object SettingsCopy {
         Copy("skip_onboarding", Group.EASE, "首次引导", "自动点掉隐私同意、年龄、身份选择"),
         Copy("exit_guard", Group.EASE, "退出守卫", "拦掉 App 的自我退出，方便调试"),
         Copy("settings_entry", Group.EASE, "模块入口", "在快对设置页加一行，点开模块设置"),
+        Copy("push_guard", Group.EASE, "推送死锁防护", "挡住推送与主线程互锁，返回不再卡死"),
 
         // 答题助手
         Copy("pk_assist", Group.PK, "PK 自动作答", "口算、诗词、成语、单词 PK 自动提交答案"),

@@ -33,6 +33,7 @@ import dev.xalor.kdkit.features.host.VipPromo
 import dev.xalor.kdkit.features.host.VipUnlock
 import dev.xalor.kdkit.features.host.WatermarkOff
 import dev.xalor.kdkit.features.host.WebPictureWatermark
+import dev.xalor.kdkit.features.host.PushDeadlockGuard
 import dev.xalor.kdkit.features.host.SettingsEntry
 import dev.xalor.kdkit.features.host.SkipOnboarding
 import dev.xalor.kdkit.features.host.WebRequestLog
@@ -95,6 +96,7 @@ object FeatureRegistry {
         H5DebugConsole,
         Md3Skin,
         SettingsEntry,
+        PushDeadlockGuard,
     )
 
     val categories: List<Pair<String, String>> = listOf(

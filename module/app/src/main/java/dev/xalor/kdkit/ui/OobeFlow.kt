@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -40,15 +41,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.kyant.shapes.Capsule
 import dev.xalor.kdkit.HostVersion
+import dev.xalor.kdkit.ui.theme.IosColors
+import dev.xalor.kdkit.ui.theme.LocalIos
 import dev.xalor.kdkit.ui.theme.UiPrefs
-import io.github.neoruaa.glasmio.core.GlassColors
-import io.github.neoruaa.glasmio.core.GlasmioTheme
-import io.github.neoruaa.glasmio.core.IosTypography
-import io.github.neoruaa.glasmio.glass.GlasmioBackdropHost
-import io.github.neoruaa.glasmio.ui.GlasmioGroupedList
-import io.github.neoruaa.glasmio.ui.GlasmioListRow
 
 private enum class Step(val title: String, val caption: String) {
     Welcome("KdKit", "快对 的去广告 / 界面 / 稳定性增强模块"),
@@ -58,128 +54,99 @@ private enum class Step(val title: String, val caption: String) {
 }
 
 /**
- * 引导页 v4：转场是 AnimatedContent 的横滑 + 淡入淡出（进 220ms 弹簧、出 180ms），
- * 方向由 `forward` 决定，所以返回是反向滑；进度点用 animateDpAsState 拉长成胶囊。
+ * 引导页：一步一屏，横向弹簧转场 + 进度点拉长。
+ *
+ * 转场参数：进 220ms 弹簧（damping 0.92 / stiffness 500），出 180ms 线性滑出 + 淡出；
+ * 前进/后退方向由 `forward` 决定，所以返回是反向滑。
  */
 @Composable
-fun OobeFlow(glass: Boolean, onDone: () -> Unit) {
+fun OobeFlow(onDone: () -> Unit) {
+    val ios = LocalIos.current
     var step by remember { mutableStateOf(Step.Welcome) }
     var forward by remember { mutableStateOf(true) }
     var agreed by remember { mutableStateOf(false) }
-    val go: (Step) -> Unit = { next ->
-        forward = next.ordinal >= step.ordinal
-        step = next
-    }
-
-    if (glass) {
-        GlasmioBackdropHost(modifier = Modifier.fillMaxSize(), sampledContent = {
-            Column(Modifier.fillMaxSize().background(GlasmioTheme.colors.groupedBackground)) {}
-        }) { Body(step, forward, agreed, { agreed = !agreed }, go, onDone) }
-    } else {
-        Box(Modifier.fillMaxSize().background(GlasmioTheme.colors.groupedBackground)) {
-            Body(step, forward, agreed, { agreed = !agreed }, go, onDone)
-        }
-    }
-}
-
-@Composable
-private fun androidx.compose.foundation.layout.BoxScope.Body(
-    step: Step,
-    forward: Boolean,
-    agreed: Boolean,
-    onToggleAgree: () -> Unit,
-    go: (Step) -> Unit,
-    onDone: () -> Unit,
-) {
+    val go: (Step) -> Unit = { n -> forward = n.ordinal >= step.ordinal; step = n }
     val ctx = LocalContext.current
-    val colors = GlasmioTheme.colors
 
-    Column(Modifier.fillMaxSize().statusBarsPadding()) {
+    Column(Modifier.fillMaxSize().background(ios.groupedBg).statusBarsPadding()) {
         AnimatedContent(
             targetState = step,
             transitionSpec = {
                 val dir = if (forward) 1 else -1
                 ContentTransform(
                     targetContentEnter = slideInHorizontally(
-                        animationSpec = spring(dampingRatio = 0.92f, stiffness = 500f),
-                        initialOffsetX = { it * dir / 6 },
+                        spring(dampingRatio = 0.92f, stiffness = 500f), { it * dir / 5 },
                     ) + fadeIn(tween(160)),
-                    initialContentExit = slideOutHorizontally(
-                        animationSpec = tween(180), targetOffsetX = { -it * dir / 8 },
-                    ) + fadeOut(tween(140)),
+                    initialContentExit = slideOutHorizontally(tween(180), { -it * dir / 7 }) + fadeOut(tween(140)),
                 )
             },
-            label = "oobe",
-            modifier = Modifier.weight(1f),
+            label = "oobe", modifier = Modifier.weight(1f),
         ) { s ->
-            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp)) {
-                Spacer(Modifier.height(40.dp))
-                Text(s.title,
-                    style = if (s == Step.Welcome) IosTypography.largeTitle else IosTypography.title1,
-                    fontWeight = FontWeight.Bold, color = colors.content,
-                    fontSize = if (s == Step.Welcome) 40.sp else 32.sp)
-                Spacer(Modifier.height(8.dp))
-                Text(s.caption, style = IosTypography.subheadline, color = colors.secondaryContent)
+            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
+                Spacer(Modifier.height(36.dp))
+                Text(s.title, fontSize = if (s == Step.Welcome) 40.sp else 30.sp,
+                    fontWeight = FontWeight.Bold, color = ios.content)
+                Spacer(Modifier.height(6.dp))
+                Text(s.caption, fontSize = 14.sp, color = ios.secondary)
                 Spacer(Modifier.height(22.dp))
                 when (s) {
-                    Step.Welcome -> GlasmioGroupedList {
-                        GlasmioListRow(showTopSeparator = false,
-                            title = "默认配置偏向「少广告、少打扰」",
-                            subtitle = "每个开关都能单独关掉；标了即时生效的不用重启快对")
+                    Step.Welcome -> InfoCard(ios) {
+                        Line("默认配置偏向「少广告、少打扰」", ios)
+                        Line("每个开关都能单独关掉；标了即时生效的不用重启快对", ios, muted = true)
                     }
-                    Step.Check -> CheckGroup()
+                    Step.Check -> CheckCard(ios)
                     Step.Notice -> Column {
-                        GlasmioGroupedList {
-                            GlasmioListRow(showTopSeparator = false, title = "只改快对 App 自身的界面与广告加载", subtitle = "不修改服务器数据")
-                            GlasmioListRow(title = "会员 / 付费内容解锁不在范围内", showDisclosure = false)
-                            GlasmioListRow(title = "需要 root + Xposed 框架（LSPosed / Vector）", showDisclosure = false)
-                            GlasmioListRow(title = "出问题请带 logcat 到 GitHub Issues", showDisclosure = false)
+                        InfoCard(ios) {
+                            Line("只改快对 App 自身的界面与广告加载", ios, bold = true)
+                            Line("不修改服务器数据", ios, muted = true)
+                            Divider(ios)
+                            Line("会员 / 付费内容解锁不在范围内", ios)
+                            Line("需要 root + Xposed 框架（LSPosed / Vector）", ios)
+                            Line("出问题请带 logcat 到 GitHub Issues", ios)
                         }
-                        Spacer(Modifier.height(10.dp))
-                        Row(Modifier.fillMaxWidth().clickable(onClick = onToggleAgree)
-                            .padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Box(Modifier.size(22.dp).clip(Capsule())
-                                .background(if (agreed) colors.accent else colors.container),
+                        Spacer(Modifier.height(12.dp))
+                        Row(Modifier.fillMaxWidth().clickable { agreed = !agreed }.padding(vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(22.dp).clip(RoundedCornerShape(50))
+                                .background(if (agreed) ios.accent else ios.card),
                                 contentAlignment = Alignment.Center) {
                                 if (agreed) Text("✓", fontSize = 13.sp, color = Color.White)
                             }
                             Spacer(Modifier.width(10.dp))
-                            Text("我已阅读并理解以上说明", style = IosTypography.body, color = colors.content)
+                            Text("我已阅读并理解以上说明", fontSize = 15.sp, color = ios.content)
                         }
                     }
                     Step.Done -> Column {
-                        CheckGroup()
-                        Spacer(Modifier.height(10.dp))
-                        GlasmioGroupedList {
-                            GlasmioListRow(showTopSeparator = false,
-                                title = "下一步：开启「去广告」组，再重启一次快对")
-                        }
+                        CheckCard(ios)
+                        Spacer(Modifier.height(12.dp))
+                        InfoCard(ios) { Line("下一步：开启「去广告」组，再重启一次快对", ios) }
                     }
                 }
-                Spacer(Modifier.height(28.dp))
+                Spacer(Modifier.height(24.dp))
             }
         }
 
-        Row(Modifier.fillMaxWidth().padding(bottom = 6.dp),
+        Row(Modifier.fillMaxWidth().padding(vertical = 8.dp),
             horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
             Step.entries.forEach { s ->
                 val active = s == step
                 val w by animateDpAsState(if (active) 18.dp else 6.dp,
-                    animationSpec = spring(dampingRatio = 0.85f, stiffness = 600f), label = "dot")
-                Box(Modifier.padding(horizontal = 3.dp).width(w).height(6.dp).clip(Capsule())
-                    .background(if (active) colors.accent else colors.tertiaryContent.copy(alpha = 0.5f)))
+                    spring(dampingRatio = 0.85f, stiffness = 600f), label = "dot")
+                Box(Modifier.padding(horizontal = 3.dp).width(w).height(6.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(if (active) ios.accent else ios.tertiary))
             }
         }
 
-        Column(Modifier.navigationBarsPadding().padding(horizontal = 24.dp, vertical = 12.dp)) {
-            PrimaryAction(
-                label = when (step) {
+        Column(Modifier.navigationBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp)) {
+            PrimaryButton(
+                when (step) {
                     Step.Welcome -> "开始"
                     Step.Check -> "我已在框架里启用，继续"
                     Step.Notice -> "继续"
                     Step.Done -> "进入设置"
                 },
-                enabled = step != Step.Notice || agreed,
+                enabled = step != Step.Notice || agreed, ios = ios,
             ) {
                 when (step) {
                     Step.Welcome -> go(Step.Check)
@@ -189,39 +156,63 @@ private fun androidx.compose.foundation.layout.BoxScope.Body(
                 }
             }
             if (step == Step.Check) {
-                Text("先跳过检查", style = IosTypography.caption1, color = colors.tertiaryContent,
-                    modifier = Modifier.fillMaxWidth().clickable { go(Step.Notice) }
-                        .padding(vertical = 10.dp))
+                Text("先跳过检查", fontSize = 13.sp, color = ios.secondary,
+                    modifier = Modifier.fillMaxWidth().clickable { go(Step.Notice) }.padding(vertical = 10.dp))
             }
         }
     }
 }
 
 @Composable
-private fun PrimaryAction(label: String, enabled: Boolean, onClick: () -> Unit) {
-    val colors = GlasmioTheme.colors
-    Box(Modifier.fillMaxWidth().height(52.dp).clip(Capsule())
-        .background(if (enabled) colors.accent else colors.accent.copy(alpha = 0.35f))
-        .clickable(enabled = enabled, onClick = onClick), contentAlignment = Alignment.Center) {
-        Text(label, style = IosTypography.body, color = Color.White, fontWeight = FontWeight(600))
+private fun InfoCard(ios: IosColors, content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(ios.card)
+        .padding(horizontal = 16.dp, vertical = 14.dp), content = content)
+}
+
+@Composable
+private fun androidx.compose.foundation.layout.ColumnScope.Line(text: String, ios: IosColors,
+                                                                bold: Boolean = false, muted: Boolean = false) {
+    Text(text, fontSize = if (bold) 16.sp else 14.sp,
+        fontWeight = if (bold) FontWeight.SemiBold else FontWeight.Normal,
+        color = if (muted) ios.secondary else ios.content,
+        modifier = Modifier.padding(vertical = 5.dp))
+}
+
+@Composable
+private fun androidx.compose.foundation.layout.ColumnScope.Divider(ios: IosColors) {
+    Box(Modifier.fillMaxWidth().height(1.dp).background(ios.separator).padding(vertical = 6.dp))
+}
+
+@Composable
+private fun CheckCard(ios: IosColors) {
+    val ctx = LocalContext.current
+    val health = remember { channelHealth(ctx) }
+    InfoCard(ios) {
+        StateLine("快对版本", "${HostVersion.BASELINE_VERSION_NAME} / ${HostVersion.BASELINE_VERSION_CODE}", true, ios)
+        Divider(ios)
+        StateLine("配置通道", if (health.ok) health.line else "未发布 —— 在框架里启用模块后重开本应用",
+            health.ok, ios)
+        Divider(ios)
+        StateLine("框架注入", if (health.ok) "正常" else "未生效", health.ok, ios)
     }
 }
 
 @Composable
-private fun CheckGroup() {
-    val ctx = LocalContext.current
-    val health = remember { channelHealth(ctx) }
-    GlasmioGroupedList {
-        GlasmioListRow(showTopSeparator = false, showDisclosure = false,
-            title = "快对版本",
-            subtitle = "${HostVersion.BASELINE_VERSION_NAME} / ${HostVersion.BASELINE_VERSION_CODE}",
-            systemName = "checkmark")
-        GlasmioListRow(showDisclosure = false,
-            title = "配置通道",
-            subtitle = if (health.ok) health.line else "未发布 —— 在框架里启用模块后重开本应用",
-            systemName = if (health.ok) "checkmark" else "xmark")
-        GlasmioListRow(showDisclosure = false,
-            title = "框架注入", subtitle = if (health.ok) "正常" else "未生效",
-            systemName = if (health.ok) "checkmark" else "xmark")
+private fun androidx.compose.foundation.layout.ColumnScope.StateLine(
+    name: String, value: String, ok: Boolean, ios: IosColors,
+) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(name, fontSize = 15.sp, color = ios.content, modifier = Modifier.weight(1f))
+        Text(if (ok) "✓ " else "✕ ", fontSize = 13.sp, color = if (ok) ios.accent else ios.destructive)
+        Text(value, fontSize = 12.sp, color = ios.secondary)
+    }
+}
+
+@Composable
+private fun PrimaryButton(label: String, enabled: Boolean, ios: IosColors, onClick: () -> Unit) {
+    Box(Modifier.fillMaxWidth().height(50.dp).clip(RoundedCornerShape(14.dp))
+        .background(if (enabled) ios.accent else ios.accent.copy(alpha = 0.35f))
+        .clickable(enabled = enabled, onClick = onClick), contentAlignment = Alignment.Center) {
+        Text(label, fontSize = 16.sp, color = Color.White, fontWeight = FontWeight.SemiBold)
     }
 }
