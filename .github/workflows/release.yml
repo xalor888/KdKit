@@ -7,6 +7,10 @@ on:
 
 permissions:
   contents: write
+  # 更新索引后同一流程里直接把 docs/ 发布到 Pages。
+  # 不用"等 Pages 工作流被 push 触发"：用 GITHUB_TOKEN 推的提交不会触发其它 workflow。
+  pages: write
+  id-token: write
 
 concurrency:
   group: release-${{ github.ref }}
@@ -99,6 +103,13 @@ jobs:
             git commit -m "chore(repo): LSPosed index for ${GITHUB_REF_NAME} [skip ci]"
             git push origin HEAD:main
           fi
+
+      - name: Deploy LSPosed index to Pages
+        uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - uses: actions/deploy-pages@v4
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
