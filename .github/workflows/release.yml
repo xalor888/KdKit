@@ -88,7 +88,23 @@ jobs:
       # LSPosed / Vector 的"模块仓库"读的是静态 JSON（repo.json + modules.json）。
       # md5 / size 必须和刚发出去的 APK 完全一致，所以在这里用脚本回写、再提交回 main，
       # GitHub Pages 会自动从 docs/ 发布成 https://xalor888.github.io/KdKit/repo.json
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            KdKit-*.apk
+            KdKit-*.apk.sha256
+            docs/repo.json
+            docs/modules.json
+          generate_release_notes: true
+          draft: false
+
+      - name: Deploy LSPosed index to Pages
+        uses: actions/configure-pages@v5
       - name: Update LSPosed repo index
+        # 容错：索引只是下载页的元数据，抢推失败**绝不能**拖累 APK 发布
+        # （2026-11-15 真踩到：本地同时推了 main，这里 push 被 reject，整条 release 变红、APK 没发）
+        continue-on-error: true
         run: |
           set -euo pipefail
           VER="${GITHUB_REF_NAME#v}"
@@ -101,23 +117,13 @@ jobs:
             echo "index unchanged"
           else
             git commit -m "chore(repo): LSPosed index for ${GITHUB_REF_NAME} [skip ci]"
-            git push origin HEAD:main
+            # 先同步远端再推；冲突时以本次生成的索引为准（它对应刚发的 APK）
+            for i in 1 2 3; do
+              if git pull --rebase -X theirs origin main && git push origin HEAD:main; then
+                exit 0
+              fi
+              git rebase --abort || true
+              sleep $((i * 3))
+            done
+            echo "::warning::索引推送失败，请手动补一次 docs/modules.json"
           fi
-
-      - name: Deploy LSPosed index to Pages
-        uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: docs
-      - uses: actions/deploy-pages@v4
-
-      - name: Publish release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            KdKit-*.apk
-            KdKit-*.apk.sha256
-            docs/repo.json
-            docs/modules.json
-          generate_release_notes: true
-          draft: false
