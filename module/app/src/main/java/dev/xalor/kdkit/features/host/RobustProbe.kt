@@ -66,7 +66,11 @@ object RobustProbe : SwitchFeature(
     summary = "记录 Robust 补丁分派（哪些被插桩的方法真的被补丁接管），用于判断其它功能的静态结论是否仍成立",
     category = Category.HOST,
     defaultOn = false,
-    hot = true,
+    // hot=false：这是**装钩子**级别的开关，不是回调级别的。
+    // `PatchProxy.proxy` 是全 APK 唯一补丁分派点（7594 个类 / 35784 处调用），
+    // 一旦装钩子，宿主每一处插桩方法的**每次执行**都要过一遍 Xposed 分派 + 
+    // MethodHookParam 分配 —— 关掉开关也照样付这个代价。所以改成"开着才装"。
+    hot = false,
 ) {
     /** 单进程最多记这么多条 —— 补丁分派在高频方法上可能每秒数十次。 */
     private const val MAX_ROWS = 400
@@ -90,6 +94,11 @@ object RobustProbe : SwitchFeature(
     )
 
     override fun install() {
+        // 关着就不装钩子：见类头 `hot = false` 的理由（这是装钩子级开关）。
+        if (!dev.xalor.kdkit.config.KdConfig.isOn(id, false)) {
+            KdLog.i("RobustProbe: 未启用，跳过安装（不给宿主全站补丁分派加开销）")
+            return
+        }
         var n = 0
         // 入口：`PatchProxy.proxy(...)` 是所有插桩方法共用的唯一分派点。
         //

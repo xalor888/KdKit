@@ -272,11 +272,25 @@ object AntiDetect : SwitchFeature(
 
     private fun installFileFilters(): Int {
         var k = 0
+        // 热路径（每次 `File.exists()` 都走这里）：不用 runCatching ——
+        // `runCatching` 每次调用都分配一个 `Result`，`File.exists` 在真实 App 里是
+        // 每秒数百次级别的调用，这个分配白拿。改成裸 try/catch，零分配。
         k += Xp.hookAllBefore("java.io.File", "exists", cl = null, gate = id) { p ->
-            runCatching { denyFile(p, "exists") }.onFailure { warn("file.exists", it) }
+            try {
+                denyFile(p, "exists")
+            } catch (t: Throwable) {
+                warn("file.exists", t)
+            }
         }
+        // 热路径（每次 `File.isFile()` 都走这里）：不用 runCatching ——
+        // `runCatching` 每次调用都分配一个 `Result`，`File.exists` 在真实 App 里是
+        // 每秒数百次级别的调用，这个分配白拿。改成裸 try/catch，零分配。
         k += Xp.hookAllBefore("java.io.File", "isFile", cl = null, gate = id) { p ->
-            runCatching { denyFile(p, "isFile") }.onFailure { warn("file.isfile", it) }
+            try {
+                denyFile(p, "isFile")
+            } catch (t: Throwable) {
+                warn("file.isfile", t)
+            }
         }
         k += Xp.hookAllBefore("java.io.File", "isDirectory", cl = null, gate = id) { p ->
             runCatching { denyFile(p, "isDirectory") }.onFailure { warn("file.isdir", it) }
@@ -443,23 +457,22 @@ object AntiDetect : SwitchFeature(
     private fun installClassFilters(): Int {
         for (c in SELF_CLASSES) runCatching { Class.forName(c) }
         var k = 0
-        // **`Class.forName` 不在启动路径上直接装**：本宿主带 DProtect 加固，
-        // `InitializationProvider` 安装期间它会重新用反射调用 `Class.forName`，
-        // 而那次重入拿不到 caller ClassLoader ⇒ 连 `androidx.emoji2...` 都 CNFE ⇒ 启动崩溃
-        // （2026-11-14 实测：只装 forName 必崩、只装 loadClass 正常；见 `work/anti_detect_audit.md` §验证）。
-        // 因此延后 15 秒（启动完成之后）再装；代价是启动窗口内的探测拦不到。
-        runCatching {
-            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                runCatching {
-                    Xp.under(id) {
-                        Xp.hookAllBefore("java.lang.Class", "forName", cl = null, gate = id) { p ->
-                            runCatching { denyClass(p, "Class.forName", false) }.onFailure { warn("class.forname", it) }
-                        }
-                    }
-                    KdLog.i("AntiDetect: Class.forName 过滤已延后装上（避开加固的启动自检）")
-                }.onFailure { warn("class.forname.late", it) }
-            }, 15_000)
-        }.onFailure { warn("class.forname.post", it) }
+        // **`Class.forName` 一律不钩（2026-11-15 真机两次实证）**
+        //
+        // 现象 1（启动期）：DProtect 的 `InitializationProvider` 在安装期间反射调
+        // `Class.forName`，此时栈上拿不到 caller ClassLoader ⇒ 连 `androidx.emoji2`
+        // 都抛 ClassNotFound ⇒ 启动崩溃。当时的对策是"延后 15 秒再装"。
+        //
+        // 现象 2（延后装也不行）：15 秒后装上，`com.zybang.camera.activity.SearchCameraSDKActivity`
+        // 启动时 `tu.b.i()` 里的 `Class.forName("com.zybang.camera.strategy.cameramode.ScanCameraStrategy")`
+        // 抛 ClassNotFoundException ⇒ `Unable to start activity` ⇒ **拍题页直接崩/黑屏**，
+         // 用户看到的就是"拍完题回不去"。把模块卸掉后同一路径正常启动（对照实验已做）。
+        //
+        // 结论：`Class.forName` 的单参重载依赖 native 栈上的 caller loader，被 hook 之后
+        // 这条语义不可靠，**不是"什么时候装"的问题，装了就一定会坏**。而
+        // `ClassLoader.loadClass` 显式带着 this(loader)，语义不受 hook 影响 —— 风控 SDK
+        // 探针用的正是 `ClassLoader.getSystemClassLoader().loadClass(...)`，只钩这个就够。
+        // 详见 `work/anti_detect_audit.md` §验证。
         k += Xp.hookAllBefore("java.lang.ClassLoader", "loadClass", cl = null, gate = id) { p ->
             runCatching { denyClass(p, "ClassLoader.loadClass", true) }.onFailure { warn("class.load", it) }
         }

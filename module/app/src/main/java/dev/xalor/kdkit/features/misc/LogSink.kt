@@ -98,8 +98,11 @@ object LogSink : SwitchFeature(
         //   v 236 / d 708 / i 309 / w 399 / e 800 / wtf 10
         // 原来只钩 d/i/w/e —— 漏掉 v（236 处，调试路径里常有关键线索）与 wtf（10 处，
         // 崩溃前的最后一条）。`println` 只有 16 处且不带级别，不值得加。
-        for (m in listOf("v", "d", "i", "w", "e", "wtf")) {
-            n += Xp.hookAll("android.util.Log", m, Xp.classLoader, object : XC_MethodHook() {
+        for (method in listOf("v", "d", "i", "w", "e", "wtf")) {
+            // 级别字符**在装钩子时就算好**：`m.uppercase()[0]` 原来在每一条日志上执行一次，
+            // 每次都要 `uppercase()` 分配一个新 String。日志是高频路径，这条白拿。
+            val levelChar = method[0].uppercaseChar()
+            n += Xp.hookAll("android.util.Log", method, Xp.classLoader, object : XC_MethodHook() {
                 override fun afterHookedMethod(param: MethodHookParam) {
                     if (!KdConfig.isOn(id, true)) return
                     val a = param.args ?: return
@@ -112,7 +115,7 @@ object LogSink : SwitchFeature(
                         dropped.incrementAndGet()
                         return
                     }
-                    Capture.append("APPSIGN ${m.uppercase()[0]}/$tag: ${msg.take(MAX_LINE)}")
+                    Capture.append("APPSIGN $levelChar/$tag: ${msg.take(MAX_LINE)}")
                 }
             })
         }

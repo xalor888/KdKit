@@ -5,15 +5,15 @@
     "author": "xalor",
     "description": "快对去广告 / 界面 / 稳定性增强：去掉开屏、横幅、页签、弹窗、信息流与会员推销",
     "homepage": "https://github.com/xalor888/KdKit",
-    "version": "1.4.2",
-    "versionCode": 11,
+    "version": "1.4.3",
+    "versionCode": 12,
     "minApi": 26,
     "targetApi": 37,
     "scope": [
       "com.kuaiduizuoye.scan"
     ],
-    "md5": "7a63f80bbfa07ff34c006ceb6a0b9dda",
-    "size": 13751106,
-    "releaseUrl": "https://github.com/xalor888/KdKit/releases/download/v1.4.2/KdKit-v1.4.2.apk"
+    "md5": "e13b45240594632f6b6b6b2981be818f",
+    "size": 13751104,
+    "releaseUrl": "https://github.com/xalor888/KdKit/releases/download/v1.4.3/KdKit-v1.4.3.apk"
   }
 ]
