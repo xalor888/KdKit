@@ -98,6 +98,13 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
 
+    // Miuix：整套设置页（标题 / 分组 / 卡片 / 开关行 / 下拉 / 弹窗）都用它
+    implementation("top.yukonga.miuix.kmp:miuix-ui:0.9.3")
+    implementation("top.yukonga.miuix.kmp:miuix-preference:0.9.3")
+
+    // 液态玻璃（与本地 murexide-plus 同版本）：Kyant 的 backdrop + 连续曲率形状
+    implementation("io.github.kyant0:backdrop:2.0.1")
+    implementation("io.github.kyant0:shapes:1.2.1")
 
     implementation("androidx.activity:activity-compose:1.13.0")
     implementation("androidx.core:core-ktx:1.13.1")
