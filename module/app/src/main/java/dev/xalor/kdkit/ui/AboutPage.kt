@@ -5,7 +5,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
@@ -21,7 +23,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import top.yukonga.miuix.kmp.basic.Card
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Row
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -55,13 +58,19 @@ fun AboutPage(onBack: () -> Unit, onReplayOobe: () -> Unit = {}) {
         }
     }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        ArrowPreference(
-            title = "返回",
-            summary = null,
-            onClick = onBack,
-            modifier = Modifier.padding(top = 6.dp),
-        )
+    Column(
+        Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()
+            .verticalScroll(rememberScrollState()),
+    ) {
+        // 返回：一行文字就好（用 ArrowPreference 会出现"返回 ›"的怪样子）
+        Row(
+            Modifier.fillMaxWidth().padding(start = 24.dp, top = 10.dp, bottom = 2.dp),
+        ) {
+            Text(
+                "← 返回", fontSize = 15.sp, color = c.primary,
+                modifier = Modifier.clickable(onClick = onBack).padding(vertical = 6.dp),
+            )
+        }
         Text(
             "关于 KdKit", fontSize = 26.sp, modifier = Modifier.padding(start = 24.dp, top = 8.dp),
             color = c.onSurface,
@@ -73,7 +82,7 @@ fun AboutPage(onBack: () -> Unit, onReplayOobe: () -> Unit = {}) {
         )
 
         SmallTitle("更新")
-        Card(Modifier.padding(horizontal = 12.dp)) {
+        GroupCard(Modifier.padding(horizontal = 12.dp)) {
             ArrowPreference(
                 title = when (val s = state) {
                     Ui.Checking -> "正在检查更新…"
@@ -90,7 +99,7 @@ fun AboutPage(onBack: () -> Unit, onReplayOobe: () -> Unit = {}) {
         }
 
         SmallTitle("引导")
-        Card(Modifier.padding(horizontal = 12.dp)) {
+        GroupCard(Modifier.padding(horizontal = 12.dp)) {
             ArrowPreference(
                 title = "重看引导",
                 summary = "重新走一遍首次启动的四步说明",
@@ -99,7 +108,7 @@ fun AboutPage(onBack: () -> Unit, onReplayOobe: () -> Unit = {}) {
         }
 
         SmallTitle("项目")
-        Card(Modifier.padding(horizontal = 12.dp)) {
+        GroupCard(Modifier.padding(horizontal = 12.dp)) {
             ArrowPreference(title = "项目主页", summary = UpdateApi.repoUrl, onClick = {
                 UpdateApi.openReleases(ctx)
             })
@@ -107,7 +116,7 @@ fun AboutPage(onBack: () -> Unit, onReplayOobe: () -> Unit = {}) {
         }
 
         SmallTitle("兼容")
-        Card(Modifier.padding(horizontal = 12.dp)) {
+        GroupCard(Modifier.padding(horizontal = 12.dp)) {
             Text(
                 "基线 快对 ${dev.xalor.kdkit.HostVersion.BASELINE_VERSION_NAME}" +
                     "（${dev.xalor.kdkit.HostVersion.BASELINE_VERSION_CODE}）",

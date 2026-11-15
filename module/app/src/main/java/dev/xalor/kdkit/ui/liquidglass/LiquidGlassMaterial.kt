@@ -31,9 +31,12 @@ import androidx.compose.ui.unit.dp
  *
  * 所以玻璃的"厚度感"改用**多层纯色**堆出来，而不是渐变或模糊：
  *  1. 主体：半透明白（浅色）/ 半透明深灰（深色）
- *  2. 顶部高光：上半部分叠一层 +8% 白，模拟玻璃上缘的 specular
- *  3. 底缘压暗：下缘叠一层 -5% 黑，让下缘"沉下去"
- *  4. 1dp 描边：提亮轮廓
+ *  2. 底缘压暗：下缘叠一层 -5% 黑，让下缘"沉下去"
+ *  3. 1dp 描边：勾轮廓
+ *
+ * **不要顶部高光块**：内嵌矩形在胶囊里会因为圆角半径大于自身半高，
+ * 在底部渲染出一条发亮的弧线（看起来像底栏底下多了个"光"）。
+ * 现在玻璃是平的：只剩主体 + 下缘压暗 + 描边。
  *
  * 交互层（拖拽弹簧、按压放大、指示器形变）仍然保留 murexide 原版实现。
  */
@@ -48,16 +51,6 @@ fun Modifier.liquidGlassSurface(
         // ① 主体
         drawRoundRect(
             color = if (light) Color(0xFAF4F4F6) else Color(0xFA1C1C1E),
-            cornerRadius = r,
-        )
-        // ② 上半高光：用**内嵌实色圆角矩形**模拟，不用 Brush
-        //    （真机上任何渐变 Brush 都会让小米 libhwui 在 MiBackgroundBlurBlend 崩，
-        //     例如 2026-11-15 10:51 那次；纯色多层是唯一稳的路子）
-        val inset = 1.dp.toPx()
-        drawRoundRect(
-            color = if (light) Color(0x1FFFFFFF) else Color(0x1AFFFFFF),
-            topLeft = Offset(inset, inset),
-            size = Size(size.width - inset * 2, size.height * 0.46f),
             cornerRadius = r,
         )
         // ③ 下缘压暗

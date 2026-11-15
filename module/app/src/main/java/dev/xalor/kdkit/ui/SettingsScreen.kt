@@ -46,7 +46,6 @@ import dev.xalor.kdkit.features.FeatureRegistry
 import dev.xalor.kdkit.ui.liquidglass.LiquidBottomTabs
 import dev.xalor.kdkit.ui.theme.UiPrefs
 import kotlinx.coroutines.launch
-import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
@@ -124,7 +123,7 @@ fun SettingsScreen(
             }
             item(key = "appearance") {
                 SmallTitle("外观")
-                Card {
+                GroupCard() {
                     ArrowPreference(
                         title = "主题",
                         summary = UiPrefs.label(mode),
@@ -143,7 +142,7 @@ fun SettingsScreen(
                 }
                 item(key = "search_result") {
                     SmallTitle("搜索结果（${hits.size}）")
-                    Card {
+                    GroupCard() {
                         hits.forEach { f -> FeatureRow(f, states[f.id] == true) { v -> set(f.id, v) } }
                     }
                 }
@@ -173,7 +172,7 @@ fun SettingsScreen(
                         }
                     }
                     item(key = "c_${g.id}") {
-                        Card {
+                        GroupCard() {
                             items.forEach { f -> FeatureRow(f, states[f.id] == true) { v -> set(f.id, v) } }
                         }
                     }
@@ -203,6 +202,13 @@ fun SettingsScreen(
     }
 }
 
+/**
+ * 卡片的显式配色。
+ *
+ * 为什么不用 `Card {}` 的默认色：miuix 默认卡片色在**深色模式下与页面底色几乎同色**
+ * （都是近黑），整页看上去就是"没有卡片、只有一堆漂浮的文字"。这里固定用
+ * `surfaceContainerHigh`，深浅色都能看出卡片边界。
+ */
 @Composable
 private fun DockItem(index: Int, selected: Boolean, overlayPass: Boolean) {
     val (icon, label) = DockIcons[index]

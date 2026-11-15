@@ -81,11 +81,32 @@ jobs:
           sha256sum "KdKit-${GITHUB_REF_NAME}.apk" | tee "KdKit-${GITHUB_REF_NAME}.apk.sha256"
           ls -l "KdKit-${GITHUB_REF_NAME}.apk"
 
+      # LSPosed / Vector 的"模块仓库"读的是静态 JSON（repo.json + modules.json）。
+      # md5 / size 必须和刚发出去的 APK 完全一致，所以在这里用脚本回写、再提交回 main，
+      # GitHub Pages 会自动从 docs/ 发布成 https://xalor888.github.io/KdKit/repo.json
+      - name: Update LSPosed repo index
+        run: |
+          set -euo pipefail
+          VER="${GITHUB_REF_NAME#v}"
+          CODE="$(grep -oE 'versionCode = [0-9]+' module/app/build.gradle.kts | head -1 | grep -oE '[0-9]+')"
+          python3 kit/scripts/gen_repo_index.py "KdKit-${GITHUB_REF_NAME}.apk" "$VER" "$CODE"
+          git config user.name "kdkit-bot"
+          git config user.email "kdkit-bot@users.noreply.github.com"
+          git add docs/modules.json
+          if git diff --cached --quiet; then
+            echo "index unchanged"
+          else
+            git commit -m "chore(repo): LSPosed index for ${GITHUB_REF_NAME} [skip ci]"
+            git push origin HEAD:main
+          fi
+
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             KdKit-*.apk
             KdKit-*.apk.sha256
+            docs/repo.json
+            docs/modules.json
           generate_release_notes: true
           draft: false

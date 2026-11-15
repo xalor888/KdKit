@@ -28,8 +28,8 @@ android {
         applicationId = "dev.xalor.kdkit"
         minSdk = 26
         targetSdk = 36
-        versionCode = 9
-        versionName = "1.4.0"
+        versionCode = 10
+        versionName = "1.4.1"
     }
 
     buildFeatures {
@@ -81,7 +81,15 @@ android {
         }
     }
     packaging {
-        resources.excludes += setOf("META-INF/*", "META-INF/**")
+        // 只排掉签名/许可这类会冲突的文件，**不能整目录排除 META-INF** ——
+        // LSPosed 的模块元数据（META-INF/xposed/*）就在这个目录下，
+        // 整目录排除会让模块装上去但识别不到新式元数据（2026-11-15 踩到）。
+        resources.excludes += setOf(
+            "META-INF/*.SF", "META-INF/*.RSA", "META-INF/*.DSA", "META-INF/*.EC",
+            "META-INF/MANIFEST.MF", "META-INF/LICENSE*", "META-INF/NOTICE*",
+            "META-INF/versions/**", "META-INF/*.kotlin_module",
+            "META-INF/*.version", "META-INF/com/**", "META-INF/services/**",
+        )
     }
     lint {
         abortOnError = false

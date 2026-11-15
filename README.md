@@ -16,9 +16,27 @@ LSPosed / Vector 模块，40 个可热切换的功能，Material 3 设置页（�
 |---|---|
 | ![light](docs/screenshots/settings-light.png) | ![dark](docs/screenshots/settings-dark.png) |
 
-| 首页（M3 皮肤 + 玻璃卡片） | 「我的」页（会员推销已移除） |
+| 首个启动引导 | 关于 / 检查更新（整页，不弹窗） |
 |---|---|
-| ![host](docs/screenshots/host-glass.png) | ![promo](docs/screenshots/no-vip-promo.png) |
+| ![oobe](docs/screenshots/oobe-welcome.png) | ![about](docs/screenshots/about-light.png) |
+
+## 安装
+
+**方式一：LSPosed 模块仓库（推荐）**
+
+在 LSPosed / Vector 的「模块仓库」里添加：
+
+```
+https://xalor888.github.io/KdKit/repo.json
+```
+
+之后就能在框架里直接看到版本、更新与作用域，一键安装。
+
+**方式二：手动装 APK**
+
+1. 从 [Releases](https://github.com/xalor888/KdKit/releases/latest) 下载 `KdKit-*.apk` 安装；
+2. LSPosed / Vector 里启用 **KdKit**，作用域勾上 **快对（com.kuaiduizuoye.scan）**；
+3. 强制停止快对，再打开。
 
 ## 功能
 

@@ -1,0 +1,6 @@
+{
+  "name": "KdKit",
+  "description": "快对（com.kuaiduizuoye.scan）的去广告 / 界面 / 稳定性增强模块",
+  "homepage": "https://github.com/xalor888/KdKit",
+  "index": "modules.json"
+}
